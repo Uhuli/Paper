@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mika <Mika@zestnik.de>
+Date: Sat, 26 Apr 2025 19:51:33 +0200
+Subject: [PATCH] .
+
+
+diff --git a/net/minecraft/gametest/framework/GameTestServer.java b/net/minecraft/gametest/framework/GameTestServer.java
+index 5f3165b81b03049d92e4a1a19fe8a342639f44df..6c57921b2d08d6c31a2e6b8278bc6417b12032e7 100644
+--- a/net/minecraft/gametest/framework/GameTestServer.java
++++ b/net/minecraft/gametest/framework/GameTestServer.java
+@@ -158,10 +158,6 @@ public class GameTestServer extends MinecraftServer {
+     public boolean initServer() {
+         // Paper start
+         this.setPlayerList(new PlayerList(this, this.registries(), this.playerDataStorage, 1) {
+-            @Override
+-            public void loadAndSaveFiles() {
+-                throw new UnsupportedOperationException("Should not be called in a GameTestServer");
+-            }
+         });
+         this.loadLevel("blah");
+         // Paper end
