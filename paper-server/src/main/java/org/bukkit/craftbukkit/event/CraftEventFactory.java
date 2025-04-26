@@ -263,8 +263,6 @@ public class CraftEventFactory {
 
         if (world.dimension() != Level.OVERWORLD) return true;
         if (spawnSize <= 0) return true;
-        if (((CraftServer) Bukkit.getServer()).getHandle().getOps().isEmpty()) return true;
-        if (player.isOp()) return true;
 
         BlockPos chunkcoordinates = world.getSharedSpawnPos();
 

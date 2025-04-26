@@ -89,9 +89,6 @@ public class VanillaCommandWrapper extends BukkitCommand { // Paper
         if (sender instanceof BlockCommandSender) {
             return ((CraftBlockCommandSender) sender).getWrapper();
         }
-        if (sender instanceof RemoteConsoleCommandSender) {
-            return ((CraftRemoteConsoleCommandSender) sender).getListener().createCommandSourceStack();
-        }
         if (sender instanceof ConsoleCommandSender) {
             return ((CraftServer) sender.getServer()).getServer().createCommandSourceStack();
         }
