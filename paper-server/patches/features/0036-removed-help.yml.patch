@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mika <Mika@zestnik.de>
+Date: Sat, 26 Apr 2025 20:14:22 +0200
+Subject: [PATCH] removed help.yml
+
+
+diff --git a/net/minecraft/server/Main.java b/net/minecraft/server/Main.java
+index b06441af40637f5727a628fee43c7ecaee9dcfed..346ea78649e9bed8196e66091c23b63824b30a88 100644
+--- a/net/minecraft/server/Main.java
++++ b/net/minecraft/server/Main.java
+@@ -52,7 +52,6 @@ import net.minecraft.world.level.storage.LevelDataAndDimensions;
+ import net.minecraft.world.level.storage.LevelStorageSource;
+ import net.minecraft.world.level.storage.LevelSummary;
+ import net.minecraft.world.level.storage.PrimaryLevelData;
+-import net.minecraft.world.level.storage.WorldData;
+ import org.slf4j.Logger;
+ 
+ public class Main {
+@@ -123,11 +122,6 @@ public class Main {
+                 configuration.setDefaults(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.InputStreamReader(Main.class.getClassLoader().getResourceAsStream("configurations/bukkit.yml"), com.google.common.base.Charsets.UTF_8)));
+                 configuration.save(configFile);
+ 
+-                File commandFile = (File) optionSet.valueOf("commands-settings");
+-                org.bukkit.configuration.file.YamlConfiguration commandsConfiguration = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(commandFile);
+-                commandsConfiguration.options().copyDefaults(true);
+-                commandsConfiguration.setDefaults(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.InputStreamReader(Main.class.getClassLoader().getResourceAsStream("configurations/commands.yml"), com.google.common.base.Charsets.UTF_8)));
+-                commandsConfiguration.save(commandFile);
+                 // CraftBukkit end
+                 LOGGER.info("Initialized '{}' and '{}'", path1.toAbsolutePath(), "");
+                 return;
+diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
+index ac6bd4ac34b6b0d85dea6ebfeff06c54c0f7b57c..43d0a4d40305df3fd1cc295769916a3e7e25bba6 100644
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -740,7 +740,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+         if (io.papermc.paper.plugin.PluginInitializerManager.instance().pluginRemapper != null) io.papermc.paper.plugin.PluginInitializerManager.instance().pluginRemapper.pluginsEnabled(); // Paper - Remap plugins
+         io.papermc.paper.command.brigadier.PaperCommands.INSTANCE.setValid(); // Paper - reset invalid state for event fire below
+         io.papermc.paper.plugin.lifecycle.event.LifecycleEventRunner.INSTANCE.callReloadableRegistrarEvent(io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS, io.papermc.paper.command.brigadier.PaperCommands.INSTANCE, org.bukkit.plugin.Plugin.class, io.papermc.paper.plugin.lifecycle.event.registrar.ReloadableRegistrarEvent.Cause.INITIAL); // Paper - call commands event for regular plugins
+-        ((org.bukkit.craftbukkit.help.SimpleHelpMap) this.server.getHelpMap()).initializeCommands();
+         this.server.getPluginManager().callEvent(new org.bukkit.event.server.ServerLoadEvent(org.bukkit.event.server.ServerLoadEvent.LoadType.STARTUP));
+         this.connection.acceptConnections();
+     }
+@@ -2237,8 +2236,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+                     io.papermc.paper.plugin.lifecycle.event.LifecycleEventRunner.INSTANCE.callReloadableRegistrarEvent(io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS, io.papermc.paper.command.brigadier.PaperCommands.INSTANCE, org.bukkit.plugin.Plugin.class, io.papermc.paper.plugin.lifecycle.event.registrar.ReloadableRegistrarEvent.Cause.RELOAD); // call commands event for regular plugins
+                     final org.bukkit.craftbukkit.help.SimpleHelpMap helpMap = (org.bukkit.craftbukkit.help.SimpleHelpMap) this.server.getHelpMap();
+                     helpMap.clear();
+-                    helpMap.initializeGeneralTopics();
+-                    helpMap.initializeCommands();
+                     this.server.syncCommands(); // Refresh commands after event
+                     // Paper end
+                     new io.papermc.paper.event.server.ServerResourcesReloadedEvent(cause).callEvent(); // Paper - Add ServerResourcesReloadedEvent; fire after everything has been reloaded
