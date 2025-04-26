@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mika <Mika@zestnik.de>
+Date: Sat, 26 Apr 2025 20:17:45 +0200
+Subject: [PATCH] removed help.yml
+
+
+diff --git a/net/minecraft/commands/CommandSourceStack.java b/net/minecraft/commands/CommandSourceStack.java
+index c2b7164a1395842ab95428540782eeda4c7960b0..815624c57c277f73089552e2f701a023d5f25594 100644
+--- a/net/minecraft/commands/CommandSourceStack.java
++++ b/net/minecraft/commands/CommandSourceStack.java
+@@ -442,7 +442,7 @@ public class CommandSourceStack implements ExecutionCommandSource<CommandSourceS
+         // if the server is null, we must check the vanilla perm level system
+         // if ignoreVanillaPermissions is true, we can skip vanilla perms and just run the bukkit perm check
+         //noinspection ConstantValue
+-        if (this.getServer() == null || !this.getServer().server.ignoreVanillaPermissions) { // server & level are null for command function loading
++        if (this.getServer() == null || !true) { // server & level are null for command function loading
+             final boolean hasPermLevel = this.permissionLevel >= i;
+             if (this.forceRespectPermissionLevel()) { // NULL CommandSource and command blocks (if setting is enabled) should always pass the vanilla perm check
+                 return hasPermLevel && hasBukkitPerm.getAsBoolean();
