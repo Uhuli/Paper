@@ -1,0 +1,621 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mika <Mika@zestnik.de>
+Date: Sat, 26 Apr 2025 19:49:12 +0200
+Subject: [PATCH] =?UTF-8?q?aufr=C3=A4umen?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+
+diff --git a/ca/spottedleaf/dataconverter/util/CommandArgumentUpgrader.java b/ca/spottedleaf/dataconverter/util/CommandArgumentUpgrader.java
+index 40da70d5cf584a9730f9fe81c355cf8513fba475..2a67cb8fc09ba70f21106bdb57d9c9cab6d93485 100644
+--- a/ca/spottedleaf/dataconverter/util/CommandArgumentUpgrader.java
++++ b/ca/spottedleaf/dataconverter/util/CommandArgumentUpgrader.java
+@@ -58,7 +58,6 @@ import net.minecraft.network.chat.CommonComponents;
+ import net.minecraft.resources.ResourceKey;
+ import net.minecraft.resources.ResourceLocation;
+ import net.minecraft.server.commands.ExecuteCommand;
+-import net.minecraft.server.commands.ReturnCommand;
+ import net.minecraft.tags.TagKey;
+ import net.minecraft.util.GsonHelper;
+ import net.minecraft.world.phys.Vec2;
+@@ -131,7 +130,6 @@ public final class CommandArgumentUpgrader {
+             extra.accept(this.dispatcher);
+         }
+         ExecuteCommand.register(this.dispatcher, context);
+-        ReturnCommand.register(this.dispatcher);
+         // This looks weird, but it's what vanilla does when loading functions for datapacks
+         this.source = new CommandSourceStack(
+             CommandSource.NULL,
+diff --git a/net/minecraft/gametest/framework/GameTestHelper.java b/net/minecraft/gametest/framework/GameTestHelper.java
+index 2b62b8b5978bc0a62fb487f497a855e7c753d1d6..2eed6b65912bf5c86d08c4a0859d3b3a2f7b764f 100644
+--- a/net/minecraft/gametest/framework/GameTestHelper.java
++++ b/net/minecraft/gametest/framework/GameTestHelper.java
+@@ -956,16 +956,4 @@ public class GameTestHelper {
+         UseOnContext useOnContext = new UseOnContext(player, InteractionHand.MAIN_HAND, blockHitResult);
+         stack.useOn(useOnContext);
+     }
+-
+-    public void setBiome(ResourceKey<Biome> biome) {
+-        AABB bounds = this.getBounds();
+-        BlockPos blockPos = BlockPos.containing(bounds.minX, bounds.minY, bounds.minZ);
+-        BlockPos blockPos1 = BlockPos.containing(bounds.maxX, bounds.maxY, bounds.maxZ);
+-        Either<Integer, CommandSyntaxException> either = FillBiomeCommand.fill(
+-            this.getLevel(), blockPos, blockPos1, this.getLevel().registryAccess().lookupOrThrow(Registries.BIOME).getOrThrow(biome)
+-        );
+-        if (either.right().isPresent()) {
+-            this.fail("Failed to set biome for test");
+-        }
+-    }
+ }
+diff --git a/net/minecraft/server/chase/ChaseClient.java b/net/minecraft/server/chase/ChaseClient.java
+deleted file mode 100644
+index 4b1cc77de0eef30103cf8817158410a8adfc13d4..0000000000000000000000000000000000000000
+--- a/net/minecraft/server/chase/ChaseClient.java
++++ /dev/null
+@@ -1,174 +0,0 @@
+-package net.minecraft.server.chase;
+-
+-import com.google.common.base.Charsets;
+-import com.mojang.logging.LogUtils;
+-import java.io.BufferedReader;
+-import java.io.IOException;
+-import java.io.InputStreamReader;
+-import java.io.StringReader;
+-import java.net.Socket;
+-import java.util.List;
+-import java.util.Locale;
+-import java.util.NoSuchElementException;
+-import java.util.Optional;
+-import java.util.Scanner;
+-import javax.annotation.Nullable;
+-import net.minecraft.commands.CommandSourceStack;
+-import net.minecraft.commands.Commands;
+-import net.minecraft.network.chat.CommonComponents;
+-import net.minecraft.resources.ResourceKey;
+-import net.minecraft.server.MinecraftServer;
+-import net.minecraft.server.level.ServerLevel;
+-import net.minecraft.server.level.ServerPlayer;
+-import net.minecraft.world.level.Level;
+-import net.minecraft.world.phys.Vec2;
+-import net.minecraft.world.phys.Vec3;
+-import org.apache.commons.io.IOUtils;
+-import org.slf4j.Logger;
+-
+-public class ChaseClient {
+-    private static final Logger LOGGER = LogUtils.getLogger();
+-    private static final int RECONNECT_INTERVAL_SECONDS = 5;
+-    private final String serverHost;
+-    private final int serverPort;
+-    private final MinecraftServer server;
+-    private volatile boolean wantsToRun;
+-    @Nullable
+-    private Socket socket;
+-    @Nullable
+-    private Thread thread;
+-
+-    public ChaseClient(String serverHost, int serverPort, MinecraftServer server) {
+-        this.serverHost = serverHost;
+-        this.serverPort = serverPort;
+-        this.server = server;
+-    }
+-
+-    public void start() {
+-        if (this.thread != null && this.thread.isAlive()) {
+-            LOGGER.warn("Remote control client was asked to start, but it is already running. Will ignore.");
+-        }
+-
+-        this.wantsToRun = true;
+-        this.thread = new Thread(this::run, "chase-client");
+-        this.thread.setDaemon(true);
+-        this.thread.start();
+-    }
+-
+-    public void stop() {
+-        this.wantsToRun = false;
+-        IOUtils.closeQuietly(this.socket);
+-        this.socket = null;
+-        this.thread = null;
+-    }
+-
+-    public void run() {
+-        String string = this.serverHost + ":" + this.serverPort;
+-
+-        while (this.wantsToRun) {
+-            try {
+-                LOGGER.info("Connecting to remote control server {}", string);
+-                this.socket = new Socket(this.serverHost, this.serverPort);
+-                LOGGER.info("Connected to remote control server! Will continuously execute the command broadcasted by that server.");
+-
+-                try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(this.socket.getInputStream(), Charsets.US_ASCII))) {
+-                    while (this.wantsToRun) {
+-                        String line = bufferedReader.readLine();
+-                        if (line == null) {
+-                            LOGGER.warn("Lost connection to remote control server {}. Will retry in {}s.", string, 5);
+-                            break;
+-                        }
+-
+-                        this.handleMessage(line);
+-                    }
+-                } catch (IOException var8) {
+-                    LOGGER.warn("Lost connection to remote control server {}. Will retry in {}s.", string, 5);
+-                }
+-            } catch (IOException var9) {
+-                LOGGER.warn("Failed to connect to remote control server {}. Will retry in {}s.", string, 5);
+-            }
+-
+-            if (this.wantsToRun) {
+-                try {
+-                    Thread.sleep(5000L);
+-                } catch (InterruptedException var5) {
+-                }
+-            }
+-        }
+-    }
+-
+-    private void handleMessage(String message) {
+-        try (Scanner scanner = new Scanner(new StringReader(message))) {
+-            scanner.useLocale(Locale.ROOT);
+-            String string = scanner.next();
+-            if ("t".equals(string)) {
+-                this.handleTeleport(scanner);
+-            } else {
+-                LOGGER.warn("Unknown message type '{}'", string);
+-            }
+-        } catch (NoSuchElementException var7) {
+-            LOGGER.warn("Could not parse message '{}', ignoring", message);
+-        }
+-    }
+-
+-    private void handleTeleport(Scanner scanner) {
+-        this.parseTarget(scanner)
+-            .ifPresent(
+-                teleportTarget -> this.executeCommand(
+-                    String.format(
+-                        Locale.ROOT,
+-                        "execute in %s run tp @s %.3f %.3f %.3f %.3f %.3f",
+-                        teleportTarget.level.location(),
+-                        teleportTarget.pos.x,
+-                        teleportTarget.pos.y,
+-                        teleportTarget.pos.z,
+-                        teleportTarget.rot.y,
+-                        teleportTarget.rot.x
+-                    )
+-                )
+-            );
+-    }
+-
+-    private Optional<ChaseClient.TeleportTarget> parseTarget(Scanner scanner) {
+-        ResourceKey<Level> resourceKey = ChaseCommand.DIMENSION_NAMES.get(scanner.next());
+-        if (resourceKey == null) {
+-            return Optional.empty();
+-        } else {
+-            float f = scanner.nextFloat();
+-            float f1 = scanner.nextFloat();
+-            float f2 = scanner.nextFloat();
+-            float f3 = scanner.nextFloat();
+-            float f4 = scanner.nextFloat();
+-            return Optional.of(new ChaseClient.TeleportTarget(resourceKey, new Vec3(f, f1, f2), new Vec2(f4, f3)));
+-        }
+-    }
+-
+-    private void executeCommand(String command) {
+-        this.server
+-            .execute(
+-                () -> {
+-                    List<ServerPlayer> players = this.server.getPlayerList().getPlayers();
+-                    if (!players.isEmpty()) {
+-                        ServerPlayer serverPlayer = players.get(0);
+-                        ServerLevel serverLevel = this.server.overworld();
+-                        CommandSourceStack commandSourceStack = new CommandSourceStack(
+-                            serverPlayer.commandSource(),
+-                            Vec3.atLowerCornerOf(serverLevel.getSharedSpawnPos()),
+-                            Vec2.ZERO,
+-                            serverLevel,
+-                            4,
+-                            "",
+-                            CommonComponents.EMPTY,
+-                            this.server,
+-                            serverPlayer
+-                        );
+-                        Commands commands = this.server.getCommands();
+-                        commands.performPrefixedCommand(commandSourceStack, command);
+-                    }
+-                }
+-            );
+-    }
+-
+-    record TeleportTarget(ResourceKey<Level> level, Vec3 pos, Vec2 rot) {
+-    }
+-}
+diff --git a/net/minecraft/server/chase/ChaseServer.java b/net/minecraft/server/chase/ChaseServer.java
+deleted file mode 100644
+index 481c497ab35c2907f50d1fdb24c586489a8e9e90..0000000000000000000000000000000000000000
+--- a/net/minecraft/server/chase/ChaseServer.java
++++ /dev/null
+@@ -1,147 +0,0 @@
+-package net.minecraft.server.chase;
+-
+-import com.mojang.logging.LogUtils;
+-import java.io.IOException;
+-import java.io.OutputStream;
+-import java.net.InetAddress;
+-import java.net.ServerSocket;
+-import java.net.Socket;
+-import java.nio.channels.ClosedByInterruptException;
+-import java.nio.charset.StandardCharsets;
+-import java.util.List;
+-import java.util.Locale;
+-import java.util.concurrent.CopyOnWriteArrayList;
+-import java.util.stream.Collectors;
+-import javax.annotation.Nullable;
+-import net.minecraft.Util;
+-import net.minecraft.server.level.ServerPlayer;
+-import net.minecraft.server.players.PlayerList;
+-import org.apache.commons.io.IOUtils;
+-import org.slf4j.Logger;
+-
+-public class ChaseServer {
+-    private static final Logger LOGGER = LogUtils.getLogger();
+-    private final String serverBindAddress;
+-    private final int serverPort;
+-    private final PlayerList playerList;
+-    private final int broadcastIntervalMs;
+-    private volatile boolean wantsToRun;
+-    @Nullable
+-    private ServerSocket serverSocket;
+-    private final CopyOnWriteArrayList<Socket> clientSockets = new CopyOnWriteArrayList<>();
+-
+-    public ChaseServer(String serverBindAddress, int serverPort, PlayerList playerList, int broadcastIntervalMs) {
+-        this.serverBindAddress = serverBindAddress;
+-        this.serverPort = serverPort;
+-        this.playerList = playerList;
+-        this.broadcastIntervalMs = broadcastIntervalMs;
+-    }
+-
+-    public void start() throws IOException {
+-        if (this.serverSocket != null && !this.serverSocket.isClosed()) {
+-            LOGGER.warn("Remote control server was asked to start, but it is already running. Will ignore.");
+-        } else {
+-            this.wantsToRun = true;
+-            this.serverSocket = new ServerSocket(this.serverPort, 50, InetAddress.getByName(this.serverBindAddress));
+-            Thread thread = new Thread(this::runAcceptor, "chase-server-acceptor");
+-            thread.setDaemon(true);
+-            thread.start();
+-            Thread thread1 = new Thread(this::runSender, "chase-server-sender");
+-            thread1.setDaemon(true);
+-            thread1.start();
+-        }
+-    }
+-
+-    private void runSender() {
+-        ChaseServer.PlayerPosition playerPosition = null;
+-
+-        while (this.wantsToRun) {
+-            if (!this.clientSockets.isEmpty()) {
+-                ChaseServer.PlayerPosition playerPosition1 = this.getPlayerPosition();
+-                if (playerPosition1 != null && !playerPosition1.equals(playerPosition)) {
+-                    playerPosition = playerPosition1;
+-                    byte[] bytes = playerPosition1.format().getBytes(StandardCharsets.US_ASCII);
+-
+-                    for (Socket socket : this.clientSockets) {
+-                        if (!socket.isClosed()) {
+-                            Util.ioPool().execute(() -> {
+-                                try {
+-                                    OutputStream outputStream = socket.getOutputStream();
+-                                    outputStream.write(bytes);
+-                                    outputStream.flush();
+-                                } catch (IOException var3x) {
+-                                    LOGGER.info("Remote control client socket got an IO exception and will be closed", (Throwable)var3x);
+-                                    IOUtils.closeQuietly(socket);
+-                                }
+-                            });
+-                        }
+-                    }
+-                }
+-
+-                List<Socket> list = this.clientSockets.stream().filter(Socket::isClosed).collect(Collectors.toList());
+-                this.clientSockets.removeAll(list);
+-            }
+-
+-            if (this.wantsToRun) {
+-                try {
+-                    Thread.sleep(this.broadcastIntervalMs);
+-                } catch (InterruptedException var6) {
+-                }
+-            }
+-        }
+-    }
+-
+-    public void stop() {
+-        this.wantsToRun = false;
+-        IOUtils.closeQuietly(this.serverSocket);
+-        this.serverSocket = null;
+-    }
+-
+-    private void runAcceptor() {
+-        try {
+-            while (this.wantsToRun) {
+-                if (this.serverSocket != null) {
+-                    LOGGER.info("Remote control server is listening for connections on port {}", this.serverPort);
+-                    Socket socket = this.serverSocket.accept();
+-                    LOGGER.info("Remote control server received client connection on port {}", socket.getPort());
+-                    this.clientSockets.add(socket);
+-                }
+-            }
+-        } catch (ClosedByInterruptException var6) {
+-            if (this.wantsToRun) {
+-                LOGGER.info("Remote control server closed by interrupt");
+-            }
+-        } catch (IOException var7) {
+-            if (this.wantsToRun) {
+-                LOGGER.error("Remote control server closed because of an IO exception", (Throwable)var7);
+-            }
+-        } finally {
+-            IOUtils.closeQuietly(this.serverSocket);
+-        }
+-
+-        LOGGER.info("Remote control server is now stopped");
+-        this.wantsToRun = false;
+-    }
+-
+-    @Nullable
+-    private ChaseServer.PlayerPosition getPlayerPosition() {
+-        List<ServerPlayer> players = this.playerList.getPlayers();
+-        if (players.isEmpty()) {
+-            return null;
+-        } else {
+-            ServerPlayer serverPlayer = players.get(0);
+-            String string = ChaseCommand.DIMENSION_NAMES.inverse().get(serverPlayer.level().dimension());
+-            return string == null
+-                ? null
+-                : new ChaseServer.PlayerPosition(
+-                    string, serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ(), serverPlayer.getYRot(), serverPlayer.getXRot()
+-                );
+-        }
+-    }
+-
+-    record PlayerPosition(String dimensionName, double x, double y, double z, float yRot, float xRot) {
+-        String format() {
+-            return String.format(Locale.ROOT, "t %s %.2f %.2f %.2f %.2f %.2f\n", this.dimensionName, this.x, this.y, this.z, this.yRot, this.xRot);
+-        }
+-    }
+-}
+diff --git a/net/minecraft/server/chase/package-info.java b/net/minecraft/server/chase/package-info.java
+deleted file mode 100644
+index 10e109c1a9fb3d832572099eaca2fbcc6bae0379..0000000000000000000000000000000000000000
+--- a/net/minecraft/server/chase/package-info.java
++++ /dev/null
+@@ -1,8 +0,0 @@
+-@ParametersAreNonnullByDefault
+-@MethodsReturnNonnullByDefault
+-@FieldsAreNonnullByDefault
+-package net.minecraft.server.chase;
+-
+-import javax.annotation.ParametersAreNonnullByDefault;
+-import net.minecraft.FieldsAreNonnullByDefault;
+-import net.minecraft.MethodsReturnNonnullByDefault;
+diff --git a/net/minecraft/server/dedicated/DedicatedPlayerList.java b/net/minecraft/server/dedicated/DedicatedPlayerList.java
+index 259cb4d1deef4d815382ff2b945478bdff52c1ce..9d951971482e9531b864ad3fc34c9b778a8a69e8 100644
+--- a/net/minecraft/server/dedicated/DedicatedPlayerList.java
++++ b/net/minecraft/server/dedicated/DedicatedPlayerList.java
+@@ -1,8 +1,6 @@
+ package net.minecraft.server.dedicated;
+ 
+-import com.mojang.authlib.GameProfile;
+ import com.mojang.logging.LogUtils;
+-import java.io.IOException;
+ import net.minecraft.core.LayeredRegistryAccess;
+ import net.minecraft.server.RegistryLayer;
+ import net.minecraft.server.players.PlayerList;
+@@ -17,123 +15,11 @@ public class DedicatedPlayerList extends PlayerList {
+         DedicatedServerProperties properties = server.getProperties();
+         this.setViewDistance(properties.viewDistance);
+         this.setSimulationDistance(properties.simulationDistance);
+-        super.setUsingWhiteList(properties.whiteList.get());
+         // Paper start - fix converting txt to json file; moved from constructor
+     }
+-    @Override
+-    public void loadAndSaveFiles() {
+-        // Paper end - fix converting txt to json file
+-        this.loadUserBanList();
+-        this.saveUserBanList();
+-        this.loadIpBanList();
+-        this.saveIpBanList();
+-        this.loadOps();
+-        this.loadWhiteList();
+-        this.saveOps();
+-        if (!this.getWhiteList().getFile().exists()) {
+-            this.saveWhiteList();
+-        }
+-    }
+-
+-    @Override
+-    public void setUsingWhiteList(boolean whitelistEnabled) {
+-        super.setUsingWhiteList(whitelistEnabled);
+-        this.getServer().storeUsingWhiteList(whitelistEnabled);
+-    }
+-
+-    @Override
+-    public void op(GameProfile profile) {
+-        super.op(profile);
+-        this.saveOps();
+-    }
+-
+-    @Override
+-    public void deop(GameProfile profile) {
+-        super.deop(profile);
+-        this.saveOps();
+-    }
+-
+-    @Override
+-    public void reloadWhiteList() {
+-        this.loadWhiteList();
+-    }
+-
+-    private void saveIpBanList() {
+-        try {
+-            this.getIpBans().save();
+-        } catch (IOException var2) {
+-            LOGGER.warn("Failed to save ip banlist: ", (Throwable)var2);
+-        }
+-    }
+-
+-    private void saveUserBanList() {
+-        try {
+-            this.getBans().save();
+-        } catch (IOException var2) {
+-            LOGGER.warn("Failed to save user banlist: ", (Throwable)var2);
+-        }
+-    }
+-
+-    private void loadIpBanList() {
+-        try {
+-            this.getIpBans().load();
+-        } catch (IOException var2) {
+-            LOGGER.warn("Failed to load ip banlist: ", (Throwable)var2);
+-        }
+-    }
+-
+-    private void loadUserBanList() {
+-        try {
+-            this.getBans().load();
+-        } catch (IOException var2) {
+-            LOGGER.warn("Failed to load user banlist: ", (Throwable)var2);
+-        }
+-    }
+-
+-    private void loadOps() {
+-        try {
+-            this.getOps().load();
+-        } catch (Exception var2) {
+-            LOGGER.warn("Failed to load operators list: ", (Throwable)var2);
+-        }
+-    }
+-
+-    private void saveOps() {
+-        try {
+-            this.getOps().save();
+-        } catch (Exception var2) {
+-            LOGGER.warn("Failed to save operators list: ", (Throwable)var2);
+-        }
+-    }
+-
+-    private void loadWhiteList() {
+-        try {
+-            this.getWhiteList().load();
+-        } catch (Exception var2) {
+-            LOGGER.warn("Failed to load white-list: ", (Throwable)var2);
+-        }
+-    }
+-
+-    private void saveWhiteList() {
+-        try {
+-            this.getWhiteList().save();
+-        } catch (Exception var2) {
+-            LOGGER.warn("Failed to save white-list: ", (Throwable)var2);
+-        }
+-    }
+-
+-    @Override
+-    public boolean isWhiteListed(GameProfile profile) {
+-        return !this.isUsingWhitelist() || this.isOp(profile) || this.getWhiteList().isWhiteListed(profile);
+-    }
+ 
+     @Override
+     public DedicatedServer getServer() {
+         return (DedicatedServer)super.getServer();
+     }
+-
+-    @Override
+-    public boolean canBypassPlayerLimit(GameProfile profile) {
+-        return this.getOps().canBypassPlayerLimit(profile);
+-    }
+ }
+diff --git a/net/minecraft/server/dedicated/DedicatedServer.java b/net/minecraft/server/dedicated/DedicatedServer.java
+index 7ed32a62b254cebb5e3902045dd9d891c541ad37..d246769d6b56301021aec71d35fd340271f4bd5c 100644
+--- a/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -203,7 +203,6 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+         if (this.convertOldUsers()) {
+             this.getProfileCache().save(false); // Paper
+         }
+-        this.getPlayerList().loadAndSaveFiles(); // Must be after convertNames
+         // Paper end - fix converting txt to json file
+         org.spigotmc.WatchdogThread.doStart(org.spigotmc.SpigotConfig.timeoutTime, org.spigotmc.SpigotConfig.restartOnCrash); // Paper - start watchdog thread
+         thread.start(); // Paper - Enhance console tab completions for brigadier commands; start console thread after MinecraftServer.console & PaperConfig are initialized
+diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index 876d207996724727ca26b139af759eab2e6f4131..a705cab1d04e36f1a97a455f199ecf392d2a2614 100644
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -787,7 +787,7 @@ public class ServerGamePacketListenerImpl
+     public void handleCustomCommandSuggestions(ServerboundCommandSuggestionPacket packet) {
+         // PacketUtils.ensureRunningOnSameThread(packet, this, this.player.serverLevel()); // Paper - AsyncTabCompleteEvent; run this async
+         // CraftBukkit start
+-        if (!this.tabSpamThrottler.isIncrementAndUnderThreshold() && !this.server.getPlayerList().isOp(this.player.getGameProfile()) && !this.server.isSingleplayerOwner(this.player.getGameProfile())) { // Paper - configurable tab spam limits
++        if (!this.tabSpamThrottler.isIncrementAndUnderThreshold() && /*!this.server.getPlayerList().isOp(this.player.getGameProfile()) removing operator */ false && !this.server.isSingleplayerOwner(this.player.getGameProfile())) { // Paper - configurable tab spam limits
+             this.disconnectAsync(Component.translatable("disconnect.spam"), org.bukkit.event.player.PlayerKickEvent.Cause.SPAM); // Paper - Kick event cause // Paper - add proper async disconnect
+             return;
+         }
+@@ -2519,7 +2519,7 @@ public class ServerGamePacketListenerImpl
+         // this.chatSpamThrottler.increment();
+         if (!this.chatSpamThrottler.isIncrementAndUnderThreshold()
+             // CraftBukkit end
+-            && !this.server.getPlayerList().isOp(this.player.getGameProfile())
++            && /*!this.server.getPlayerList().isOp(this.player.getGameProfile()) removing operators*/ false
+             && !this.server.isSingleplayerOwner(this.player.getGameProfile())) {
+             this.disconnectAsync(Component.translatable("disconnect.spam"), org.bukkit.event.player.PlayerKickEvent.Cause.SPAM); // Paper - kick event cause & add proper async disconnect
+         }
+diff --git a/net/minecraft/server/players/PlayerList.java b/net/minecraft/server/players/PlayerList.java
+index 7133951378ac3aaf8f926c0a413db43a780af992..e8a57cca32e4002d422d8e22ab787d6400ed43fe 100644
+--- a/net/minecraft/server/players/PlayerList.java
++++ b/net/minecraft/server/players/PlayerList.java
+@@ -133,8 +133,6 @@ public abstract class PlayerList {
+         this.playerIo = playerIo;
+     }
+ 
+-    abstract public void loadAndSaveFiles(); // Paper - fix converting txt to json file; moved from DedicatedPlayerList constructor
+-
+     public void placeNewPlayer(Connection connection, ServerPlayer player, CommonListenerCookie cookie) {
+         player.isRealPlayer = true; // Paper
+         player.loginTime = System.currentTimeMillis(); // Paper - Replace OfflinePlayer#getLastPlayed
+diff --git a/net/minecraft/util/debugchart/DebugSampleSubscriptionTracker.java b/net/minecraft/util/debugchart/DebugSampleSubscriptionTracker.java
+index 15de39fa82c7aea18298509fe9587d027c30cc15..886f8a131de7af289a06eb890eca12dd61206e50 100644
+--- a/net/minecraft/util/debugchart/DebugSampleSubscriptionTracker.java
++++ b/net/minecraft/util/debugchart/DebugSampleSubscriptionTracker.java
+@@ -37,9 +37,9 @@ public class DebugSampleSubscriptionTracker {
+     }
+ 
+     public void subscribe(ServerPlayer player, RemoteDebugSampleType sampleType) {
+-        if (this.playerList.isOp(player.getGameProfile())) {
++        /*if (this.playerList.isOp(player.getGameProfile())) {
+             this.subscriptionRequestQueue.add(new DebugSampleSubscriptionTracker.SubscriptionRequest(player, sampleType));
+-        }
++        }*/
+     }
+ 
+     public void tick(int tick) {
+@@ -59,9 +59,8 @@ public class DebugSampleSubscriptionTracker {
+     private void handleUnsubscriptions(long millis, int tick) {
+         for (Map<ServerPlayer, DebugSampleSubscriptionTracker.SubscriptionStartedAt> map : this.subscriptions.values()) {
+             map.entrySet().removeIf(entry -> {
+-                boolean flag = !this.playerList.isOp(entry.getKey().getGameProfile());
+                 DebugSampleSubscriptionTracker.SubscriptionStartedAt subscriptionStartedAt = entry.getValue();
+-                return flag || tick > subscriptionStartedAt.tick() + 200 && millis > subscriptionStartedAt.millis() + 10000L;
++                return tick > subscriptionStartedAt.tick() + 200 && millis > subscriptionStartedAt.millis() + 10000L;
+             });
+         }
+     }
+diff --git a/net/minecraft/world/entity/EntityType.java b/net/minecraft/world/entity/EntityType.java
+index 49201d6664656ebe34c84c1c84b5ea4878729062..c34deb332df97831d769ed9ed644c2ca6a3f76e7 100644
+--- a/net/minecraft/world/entity/EntityType.java
++++ b/net/minecraft/world/entity/EntityType.java
+@@ -1276,7 +1276,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
+         if (server != null && entity != null) {
+             EntityType<?> entityType = customData.parseEntityType(server.registryAccess(), Registries.ENTITY_TYPE);
+             if (entity.getType() == entityType) {
+-                if (level.isClientSide || !entity.getType().onlyOpCanSetNbt() || player != null && server.getPlayerList().isOp(player.getGameProfile())) {
++                if (level.isClientSide || !entity.getType().onlyOpCanSetNbt() || player != null && false) {
+                     // Paper start - filter out protected tags
+                     if (player == null || !player.getBukkitEntity().hasPermission("minecraft.nbt.place")) {
+                         customData = customData.update((compound) -> {
