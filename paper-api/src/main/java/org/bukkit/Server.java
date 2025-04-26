@@ -4,13 +4,11 @@ import com.google.common.collect.ImmutableList;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.Serializable;
-import java.net.InetAddress;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -90,7 +88,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * <p>
      * For use in {@link #broadcast(net.kyori.adventure.text.Component, java.lang.String)}.
      */
-    public static final String BROADCAST_CHANNEL_ADMINISTRATIVE = "bukkit.broadcast.admin";
+    String BROADCAST_CHANNEL_ADMINISTRATIVE = "bukkit.broadcast.admin";
 
     /**
      * Used for all announcement messages, such as informing users that a
@@ -98,31 +96,28 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * <p>
      * For use in {@link #broadcast(net.kyori.adventure.text.Component, java.lang.String)}.
      */
-    public static final String BROADCAST_CHANNEL_USERS = "bukkit.broadcast.user";
+    String BROADCAST_CHANNEL_USERS = "bukkit.broadcast.user";
 
     /**
      * Gets the name of this server implementation.
      *
      * @return name of this server implementation
      */
-    @NotNull
-    public String getName();
+    @NotNull String getName();
 
     /**
      * Gets the version string of this server implementation.
      *
      * @return version of this server implementation
      */
-    @NotNull
-    public String getVersion();
+    @NotNull String getVersion();
 
     /**
      * Gets the Bukkit version that this server is running.
      *
      * @return version of Bukkit
      */
-    @NotNull
-    public String getBukkitVersion();
+    @NotNull String getBukkitVersion();
 
     // Paper start - expose game version
     /**
@@ -161,15 +156,14 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      *
      * @return a view of currently online players.
      */
-    @NotNull
-    public Collection<? extends Player> getOnlinePlayers();
+    @NotNull Collection<? extends Player> getOnlinePlayers();
 
     /**
      * Get the maximum amount of players which can login to this server.
      *
      * @return the amount of players this server allows
      */
-    public int getMaxPlayers();
+    int getMaxPlayers();
 
     /**
      * Set the maximum amount of players allowed to be logged in at once.
@@ -183,21 +177,21 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      *
      * @return the port number of this server
      */
-    public int getPort();
+    int getPort();
 
     /**
      * Get the view distance from this server.
      *
      * @return the view distance from this server.
      */
-    public int getViewDistance();
+    int getViewDistance();
 
     /**
      * Get the simulation distance from this server.
      *
      * @return the simulation distance from this server.
      */
-    public int getSimulationDistance();
+    int getSimulationDistance();
 
     /**
      * Get the IP that this server is bound to, or empty string if not
@@ -206,67 +200,63 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @return the IP string that this server is bound to, otherwise empty
      *     string
      */
-    @NotNull
-    public String getIp();
+    @NotNull String getIp();
 
     /**
      * Get world type (level-type setting) for default world.
      *
      * @return the value of level-type (e.g. DEFAULT, FLAT, DEFAULT_1_1)
      */
-    @NotNull
-    public String getWorldType();
+    @NotNull String getWorldType();
 
     /**
      * Get generate-structures setting.
      *
      * @return true if structure generation is enabled, false otherwise
      */
-    public boolean getGenerateStructures();
+    boolean getGenerateStructures();
 
     /**
      * Get max world size.
      *
      * @return the maximum world size as specified for the server
      */
-    public int getMaxWorldSize();
+    int getMaxWorldSize();
 
     /**
      * Gets whether this server allows the End or not.
      *
      * @return whether this server allows the End or not
      */
-    public boolean getAllowEnd();
+    boolean getAllowEnd();
 
     /**
      * Gets whether this server allows the Nether or not.
      *
      * @return whether this server allows the Nether or not
      */
-    public boolean getAllowNether();
+    boolean getAllowNether();
 
     /**
      * Gets whether the server is logging the IP addresses of players.
      *
      * @return whether the server is logging the IP addresses of players
      */
-    public boolean isLoggingIPs();
+    boolean isLoggingIPs();
 
     /**
      * Gets a list of packs to be enabled.
      *
      * @return a list of packs names
      */
-    @NotNull
-    public List<String> getInitialEnabledPacks();
+    @NotNull List<String> getInitialEnabledPacks();
 
     /**
      * Gets a list of packs that will not be enabled automatically.
      *
      * @return a list of packs names
      */
-    @NotNull
-    public List<String> getInitialDisabledPacks();
+    @NotNull List<String> getInitialDisabledPacks();
 
     /**
      * Get the DataPack Manager.
@@ -276,31 +266,28 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      */
     @NotNull
     @Deprecated(forRemoval = true, since = "1.20") // Paper
-    public DataPackManager getDataPackManager();
+    DataPackManager getDataPackManager();
 
     /**
      * Get the ServerTick Manager.
      *
      * @return the manager
      */
-    @NotNull
-    public ServerTickManager getServerTickManager();
+    @NotNull ServerTickManager getServerTickManager();
 
     /**
      * Gets the resource pack configured to be sent to clients by the server.
      *
      * @return the resource pack
      */
-    @Nullable
-    public ResourcePack getServerResourcePack();
+    @Nullable ResourcePack getServerResourcePack();
 
     /**
      * Gets the server resource pack uri, or empty string if not specified.
      *
      * @return the server resource pack uri, otherwise empty string
      */
-    @NotNull
-    public String getResourcePack();
+    @NotNull String getResourcePack();
 
     /**
      * Gets the SHA-1 digest of the server resource pack, or empty string if
@@ -309,8 +296,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @return the SHA-1 digest of the server resource pack, otherwise empty
      *     string
      */
-    @NotNull
-    public String getResourcePackHash();
+    @NotNull String getResourcePackHash();
 
     /**
      * Gets the custom prompt message to be shown when the server resource
@@ -319,62 +305,14 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @return the custom prompt message to be shown when the server resource,
      *     otherwise empty string
      */
-    @NotNull
-    public String getResourcePackPrompt();
+    @NotNull String getResourcePackPrompt();
 
     /**
      * Gets whether the server resource pack is enforced.
      *
      * @return whether the server resource pack is enforced
      */
-    public boolean isResourcePackRequired();
-
-    /**
-     * Gets whether this server has a whitelist or not.
-     *
-     * @return whether this server has a whitelist or not
-     */
-    public boolean hasWhitelist();
-
-    /**
-     * Sets if the server is whitelisted.
-     *
-     * @param value true for whitelist on, false for off
-     */
-    public void setWhitelist(boolean value);
-
-    /**
-     * Gets whether the server whitelist is enforced.
-     *
-     * If the whitelist is enforced, non-whitelisted players will be
-     * disconnected when the server whitelist is reloaded.
-     *
-     * @return whether the server whitelist is enforced
-     */
-    public boolean isWhitelistEnforced();
-
-    /**
-     * Sets if the server whitelist is enforced.
-     *
-     * If the whitelist is enforced, non-whitelisted players will be
-     * disconnected when the server whitelist is reloaded.
-     *
-     * @param value true for enforced, false for not
-     */
-    public void setWhitelistEnforced(boolean value);
-
-    /**
-     * Gets a list of whitelisted players.
-     *
-     * @return a set containing all whitelisted players
-     */
-    @NotNull
-    public Set<OfflinePlayer> getWhitelistedPlayers();
-
-    /**
-     * Reloads the whitelist from disk.
-     */
-    public void reloadWhitelist();
+    boolean isResourcePackRequired();
 
     /**
      * Broadcast a message to all players.
@@ -387,7 +325,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated use {@link #broadcast(net.kyori.adventure.text.Component)}
      */
     @Deprecated // Paper
-    public int broadcastMessage(@NotNull String message);
+    int broadcastMessage(@NotNull String message);
 
     // Paper start
     /**
@@ -397,7 +335,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated use {@code sendMessage} methods that accept {@link net.kyori.adventure.text.Component}
      */
     @Deprecated
-    public default void broadcast(@NotNull net.md_5.bungee.api.chat.BaseComponent component) {
+    default void broadcast(@NotNull net.md_5.bungee.api.chat.BaseComponent component) {
         spigot().broadcast(component);
     }
 
@@ -408,7 +346,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated use {@code sendMessage} methods that accept {@link net.kyori.adventure.text.Component}
      */
     @Deprecated
-    public default void broadcast(@NotNull net.md_5.bungee.api.chat.BaseComponent... components) {
+    default void broadcast(@NotNull net.md_5.bungee.api.chat.BaseComponent... components) {
         spigot().broadcast(components);
     }
     // Paper end
@@ -455,8 +393,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      *
      * @return the name of the update folder
      */
-    @NotNull
-    public String getUpdateFolder();
+    @NotNull String getUpdateFolder();
 
     /**
      * Gets the update folder. The update folder is used to safely update
@@ -464,15 +401,14 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      *
      * @return the update folder
      */
-    @NotNull
-    public File getUpdateFolderFile();
+    @NotNull File getUpdateFolderFile();
 
     /**
      * Gets the value of the connection throttle setting.
      *
      * @return the value of the connection throttle setting
      */
-    public long getConnectionThrottle();
+    long getConnectionThrottle();
 
     /**
      * Gets default ticks per animal spawns value.
@@ -495,7 +431,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated Deprecated in favor of {@link #getTicksPerSpawns(SpawnCategory)}
      */
     @Deprecated(since = "1.18.1")
-    public int getTicksPerAnimalSpawns();
+    int getTicksPerAnimalSpawns();
 
     /**
      * Gets the default ticks per monster spawns value.
@@ -518,7 +454,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated Deprecated in favor of {@link #getTicksPerSpawns(SpawnCategory)}
      */
     @Deprecated(since = "1.18.1")
-    public int getTicksPerMonsterSpawns();
+    int getTicksPerMonsterSpawns();
 
     /**
      * Gets the default ticks per water mob spawns value.
@@ -540,7 +476,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated Deprecated in favor of {@link #getTicksPerSpawns(SpawnCategory)}
      */
     @Deprecated(since = "1.18.1")
-    public int getTicksPerWaterSpawns();
+    int getTicksPerWaterSpawns();
 
     /**
      * Gets the default ticks per water ambient mob spawns value.
@@ -562,7 +498,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated Deprecated in favor of {@link #getTicksPerSpawns(SpawnCategory)}
      */
     @Deprecated(since = "1.18.1")
-    public int getTicksPerWaterAmbientSpawns();
+    int getTicksPerWaterAmbientSpawns();
 
     /**
      * Gets the default ticks per water underground creature spawns value.
@@ -584,7 +520,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated Deprecated in favor of {@link #getTicksPerSpawns(SpawnCategory)}
      */
     @Deprecated(since = "1.18.1")
-    public int getTicksPerWaterUndergroundCreatureSpawns();
+    int getTicksPerWaterUndergroundCreatureSpawns();
 
     /**
      * Gets the default ticks per ambient mob spawns value.
@@ -606,7 +542,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @deprecated Deprecated in favor of {@link #getTicksPerSpawns(SpawnCategory)}
      */
     @Deprecated(since = "1.18.1")
-    public int getTicksPerAmbientSpawns();
+    int getTicksPerAmbientSpawns();
 
     /**
      * Gets the default ticks per {@link SpawnCategory} spawns value.
@@ -626,7 +562,7 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * @return the default ticks per {@link SpawnCategory} mobs spawn value
      * @throws IllegalArgumentException if the category is {@link SpawnCategory#MISC}
      */
-    public int getTicksPerSpawns(@NotNull SpawnCategory spawnCategory);
+    int getTicksPerSpawns(@NotNull SpawnCategory spawnCategory);
 
     /**
      * Gets a player whose name matches the given name closest.
@@ -920,17 +856,6 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
     @Nullable ItemStack createExplorerMap(@NotNull World world, @NotNull Location location, @NotNull org.bukkit.generator.structure.StructureType structureType, @NotNull org.bukkit.map.MapCursor.Type mapIcon, int radius, boolean findUnexplored);
     // Paper end
 
-    /**
-     * Reloads the server, refreshing settings and plugin information.
-     */
-    public void reload();
-
-    /**
-     * Reload only the Minecraft data for the server. This includes custom
-     * advancements and loot tables.
-     */
-    public void reloadData();
-
     // Paper start - update reloadable data
     /**
      * Updates all advancement, tag, and recipe data to all connected clients.
@@ -1164,11 +1089,6 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
      * Clears the list of crafting recipes.
      */
     public void clearRecipes();
-
-    /**
-     * Resets the list of crafting recipes to the default.
-     */
-    public void resetRecipes();
 
     /**
      * Remove a recipe from the server.
@@ -1409,90 +1329,6 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
     @NotNull
     @Deprecated(since = "1.18.1") // Paper
     PlayerProfile createPlayerProfile(@NotNull String name);
-
-    /**
-     * Gets a set containing all current IPs that are banned.
-     *
-     * @return a set containing banned IP addresses
-     */
-    @NotNull
-    public Set<String> getIPBans();
-
-    /**
-     * Bans the specified address from the server.
-     *
-     * @param address the IP address to ban
-     *
-     * @deprecated see {@link #banIP(InetAddress)}
-     */
-    @Deprecated(since = "1.20.1")
-    public void banIP(@NotNull String address);
-
-    /**
-     * Unbans the specified address from the server.
-     *
-     * @param address the IP address to unban
-     *
-     * @deprecated see {@link #unbanIP(InetAddress)}
-     */
-    @Deprecated(since = "1.20.1")
-    public void unbanIP(@NotNull String address);
-
-    /**
-     * Bans the specified address from the server.
-     *
-     * @param address the IP address to ban
-     */
-    public void banIP(@NotNull InetAddress address);
-
-    /**
-     * Unbans the specified address from the server.
-     *
-     * @param address the IP address to unban
-     */
-    public void unbanIP(@NotNull InetAddress address);
-
-    /**
-     * Gets a set containing all banned players.
-     *
-     * @return a set containing banned players
-     */
-    @NotNull
-    public Set<OfflinePlayer> getBannedPlayers();
-
-    /**
-     * Gets a ban list for the supplied type.
-     *
-     * @param type the type of list to fetch, cannot be null
-     * @param <T> The ban target
-     *
-     * @return a ban list of the specified type
-     * @deprecated use {@link #getBanList(io.papermc.paper.ban.BanListType)} to enforce the correct return value at compile time.
-     */
-    @Deprecated // Paper - add BanListType (which has a generic)
-    @NotNull
-    public <T extends BanList<?>> T getBanList(@NotNull BanList.Type type);
-
-    // Paper start - add BanListType (which has a generic)
-    /**
-     * Gets a ban list for the supplied type.
-     *
-     * @param type the type of list to fetch, cannot be null
-     * @param <B> The ban target
-     *
-     * @return a ban list of the specified type
-     */
-    @NotNull
-    <B extends BanList<E>, E> B getBanList(@NotNull io.papermc.paper.ban.BanListType<B> type);
-    // Paper end - add BanListType (which has a generic)
-
-    /**
-     * Gets a set containing all player operators.
-     *
-     * @return a set containing player operators
-     */
-    @NotNull
-    public Set<OfflinePlayer> getOperators();
 
     /**
      * Gets the default {@link GameMode} for new players.

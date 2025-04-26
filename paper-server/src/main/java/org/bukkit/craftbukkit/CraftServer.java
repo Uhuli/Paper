@@ -21,14 +21,11 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,7 +37,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
-// import jline.console.ConsoleReader;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -58,19 +54,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ReloadableServerRegistries;
 import net.minecraft.server.WorldLoader;
 import net.minecraft.server.bossevents.CustomBossEvent;
-import net.minecraft.server.commands.ReloadCommand;
 import net.minecraft.server.dedicated.DedicatedPlayerList;
 import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.dedicated.DedicatedServerProperties;
-import net.minecraft.server.dedicated.DedicatedServerSettings;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
-import net.minecraft.server.players.IpBanListEntry;
 import net.minecraft.server.players.PlayerList;
-import net.minecraft.server.players.ServerOpListEntry;
-import net.minecraft.server.players.UserBanListEntry;
-import net.minecraft.server.players.UserWhiteListEntry;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.datafix.DataFixers;
@@ -111,7 +101,6 @@ import net.minecraft.world.level.storage.PlayerDataStorage;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import net.minecraft.world.level.validation.ContentValidationException;
 import net.minecraft.world.phys.Vec3;
-import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -148,8 +137,6 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.conversations.Conversable;
-import org.bukkit.craftbukkit.ban.CraftIpBanList;
-import org.bukkit.craftbukkit.ban.CraftProfileBanList;
 import org.bukkit.craftbukkit.block.data.CraftBlockData;
 import org.bukkit.craftbukkit.boss.CraftBossBar;
 import org.bukkit.craftbukkit.boss.CraftKeyedBossbar;
@@ -212,7 +199,6 @@ import org.bukkit.entity.SpawnCategory;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerChatTabCompleteEvent;
 import org.bukkit.event.server.BroadcastMessageEvent;
-import org.bukkit.event.server.ServerLoadEvent;
 import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
@@ -883,11 +869,6 @@ public final class CraftServer implements Server {
         return this.getServer().isResourcePackRequired();
     }
 
-    @Override
-    public boolean hasWhitelist() {
-        return this.playerList.isUsingWhitelist();
-    }
-
     // NOTE: Temporary calls through to server.properies until its replaced
     private DedicatedServerProperties getProperties() {
         return this.console.getProperties();
@@ -1047,119 +1028,6 @@ public final class CraftServer implements Server {
         return false;
     }
 
-    @Override
-    public void reload() {
-        // Paper start - lifecycle events
-        if (io.papermc.paper.plugin.lifecycle.event.LifecycleEventRunner.INSTANCE.blocksPluginReloading()) {
-            throw new IllegalStateException(org.bukkit.command.defaults.ReloadCommand.RELOADING_DISABLED_MESSAGE);
-        }
-        // Paper end - lifecycle events
-        org.spigotmc.WatchdogThread.hasStarted = false; // Paper - Disable watchdog early timeout on reload
-        this.reloadCount++;
-        this.configuration = YamlConfiguration.loadConfiguration(this.getConfigFile());
-        this.commandsConfiguration = YamlConfiguration.loadConfiguration(this.getCommandsConfigFile());
-
-        this.console.settings = new DedicatedServerSettings(this.console.options);
-        DedicatedServerProperties config = this.console.settings.getProperties();
-
-        this.console.setPvpAllowed(config.pvp);
-        this.console.setFlightAllowed(config.allowFlight);
-        this.console.setMotd(config.motd);
-        this.overrideSpawnLimits();
-        this.warningState = WarningState.value(this.configuration.getString("settings.deprecated-verbose"));
-        TicketType.PLUGIN.timeout = this.configuration.getInt("chunk-gc.period-in-ticks");
-        this.minimumAPI = ApiVersion.getOrCreateVersion(this.configuration.getString("settings.minimum-api"));
-        this.printSaveWarning = false;
-        this.console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
-        this.loadIcon();
-        this.loadCompatibilities();
-        CraftMagicNumbers.INSTANCE.getCommodore().updateReroute(activeCompatibilities::contains);
-
-        try {
-            this.playerList.getIpBans().load();
-        } catch (IOException ex) {
-            this.logger.log(Level.WARNING, "Failed to load banned-ips.json, " + ex.getMessage());
-        }
-        try {
-            this.playerList.getBans().load();
-        } catch (IOException ex) {
-            this.logger.log(Level.WARNING, "Failed to load banned-players.json, " + ex.getMessage());
-        }
-
-        org.spigotmc.SpigotConfig.init((File) this.console.options.valueOf("spigot-settings")); // Spigot
-        this.console.paperConfigurations.reloadConfigs(this.console);
-        for (ServerLevel world : this.console.getAllLevels()) {
-            // world.serverLevelData.setDifficulty(config.difficulty); // Paper - per level difficulty
-            world.setSpawnSettings(world.serverLevelData.getDifficulty() != Difficulty.PEACEFUL && config.spawnMonsters); // Paper - per level difficulty (from MinecraftServer#setDifficulty(ServerLevel, Difficulty, boolean))
-
-            for (SpawnCategory spawnCategory : SpawnCategory.values()) {
-                if (CraftSpawnCategory.isValidForLimits(spawnCategory)) {
-                    long ticksPerCategorySpawn = this.getTicksPerSpawns(spawnCategory);
-                    if (ticksPerCategorySpawn < 0) {
-                        world.ticksPerSpawnCategory.put(spawnCategory, CraftSpawnCategory.getDefaultTicksPerSpawn(spawnCategory));
-                    } else {
-                        world.ticksPerSpawnCategory.put(spawnCategory, ticksPerCategorySpawn);
-                    }
-                }
-            }
-            world.spigotConfig.init(); // Spigot
-        }
-
-        Plugin[] pluginClone = pluginManager.getPlugins().clone(); // Paper
-        this.commandMap.clearCommands(); // Paper - Move command reloading up
-        this.pluginManager.clearPlugins();
-        // Paper - move up
-        // Paper start
-        for (Plugin plugin : pluginClone) {
-            entityMetadata.removeAll(plugin);
-            worldMetadata.removeAll(plugin);
-            playerMetadata.removeAll(plugin);
-        }
-        // Paper end
-        this.reloadData();
-        org.spigotmc.SpigotConfig.registerCommands(); // Spigot
-        io.papermc.paper.command.PaperCommands.registerCommands(this.console); // Paper
-        this.spark.registerCommandBeforePlugins(this); // Paper - spark
-        this.overrideAllCommandBlockCommands = this.commandsConfiguration.getStringList("command-block-overrides").contains("*");
-        this.ignoreVanillaPermissions = this.commandsConfiguration.getBoolean("ignore-vanilla-permissions");
-
-        int pollCount = 0;
-
-        // Wait for at most 2.5 seconds for plugins to close their threads
-        while (pollCount < 50 && this.getScheduler().getActiveWorkers().size() > 0) {
-            try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) {}
-            pollCount++;
-        }
-
-        List<BukkitWorker> overdueWorkers = this.getScheduler().getActiveWorkers();
-        for (BukkitWorker worker : overdueWorkers) {
-            Plugin plugin = worker.getOwner();
-            this.getLogger().log(Level.SEVERE, String.format(
-                "Nag author(s): '%s' of '%s' about the following: %s",
-                plugin.getDescription().getAuthors(),
-                plugin.getDescription().getFullName(),
-                "This plugin is not properly shutting down its async tasks when it is being reloaded.  This may cause conflicts with the newly loaded version of the plugin"
-            ));
-            if (console.isDebugging()) io.papermc.paper.util.TraceUtil.dumpTraceForThread(worker.getThread(), "still running"); // Paper - Debugging
-        }
-        io.papermc.paper.plugin.PluginInitializerManager.reload(this.console); // Paper
-        this.loadPlugins();
-        this.enablePlugins(PluginLoadOrder.STARTUP);
-        this.enablePlugins(PluginLoadOrder.POSTWORLD);
-        this.spark.registerCommandAfterPlugins(this); // Paper - spark
-        if (io.papermc.paper.plugin.PluginInitializerManager.instance().pluginRemapper != null) io.papermc.paper.plugin.PluginInitializerManager.instance().pluginRemapper.pluginsEnabled(); // Paper - Remap plugins
-        // Paper start - brigadier command API
-        io.papermc.paper.command.brigadier.PaperCommands.INSTANCE.setValid(); // to clear invalid state for event fire below
-        io.papermc.paper.plugin.lifecycle.event.LifecycleEventRunner.INSTANCE.callReloadableRegistrarEvent(io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS, io.papermc.paper.command.brigadier.PaperCommands.INSTANCE, org.bukkit.plugin.Plugin.class, io.papermc.paper.plugin.lifecycle.event.registrar.ReloadableRegistrarEvent.Cause.RELOAD); // call commands event for regular plugins
-        this.helpMap.initializeCommands();
-        this.syncCommands(); // Refresh commands after event
-        // Paper end - brigadier command API
-        this.getPluginManager().callEvent(new ServerLoadEvent(ServerLoadEvent.LoadType.RELOAD));
-        org.spigotmc.WatchdogThread.hasStarted = true; // Paper - Disable watchdog early timeout on reload
-    }
-
     // Paper start - Wait for Async Tasks during shutdown
     public void waitForAsyncTasksShutdown() {
         int pollCount = 0;
@@ -1185,11 +1053,6 @@ public final class CraftServer implements Server {
         }
     }
     // Paper end - Wait for Async Tasks during shutdown
-
-    @Override
-    public void reloadData() {
-        ReloadCommand.reload(this.console);
-    }
 
     // Paper start - API for updating recipes on clients
     @Override
@@ -1819,11 +1682,6 @@ public final class CraftServer implements Server {
     }
 
     @Override
-    public void resetRecipes() {
-        this.reloadData(); // Not ideal but hard to reload a subset of a resource pack
-    }
-
-    @Override
     public boolean removeRecipe(NamespacedKey recipeKey) {
         // Paper start - API for updating recipes on clients
         return this.removeRecipe(recipeKey, false);
@@ -2216,119 +2074,6 @@ public final class CraftServer implements Server {
         OfflinePlayer player = new CraftOfflinePlayer(this, profile);
         this.offlinePlayers.put(profile.getId(), player);
         return player;
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public Set<String> getIPBans() {
-        return this.playerList.getIpBans().getEntries().stream().map(IpBanListEntry::getUser).collect(Collectors.toSet());
-    }
-
-    @Override
-    public void banIP(String address) {
-        Preconditions.checkArgument(address != null && !address.isBlank(), "Address cannot be null or blank.");
-
-        this.getBanList(org.bukkit.BanList.Type.IP).addBan(address, null, null, null);
-    }
-
-    @Override
-    public void unbanIP(String address) {
-        Preconditions.checkArgument(address != null && !address.isBlank(), "Address cannot be null or blank.");
-
-        this.getBanList(org.bukkit.BanList.Type.IP).pardon(address);
-    }
-
-    @Override
-    public void banIP(InetAddress address) {
-        Preconditions.checkArgument(address != null, "Address cannot be null.");
-
-        ((CraftIpBanList) this.getBanList(BanList.Type.IP)).addBan(address, null, (Date) null, null);
-    }
-
-    @Override
-    public void unbanIP(InetAddress address) {
-        Preconditions.checkArgument(address != null, "Address cannot be null.");
-
-        ((CraftIpBanList) this.getBanList(BanList.Type.IP)).pardon(address);
-    }
-
-    @Override
-    public Set<OfflinePlayer> getBannedPlayers() {
-        Set<OfflinePlayer> result = new HashSet<OfflinePlayer>();
-
-        for (UserBanListEntry entry : this.playerList.getBans().getEntries()) {
-            result.add(this.getOfflinePlayer(entry.getUser()));
-        }
-
-        return result;
-    }
-
-    @Override
-    public <T extends BanList<?>> T getBanList(BanList.Type type) {
-        Preconditions.checkArgument(type != null, "BanList.Type cannot be null");
-
-        return switch (type) {
-            case IP -> (T) new CraftIpBanList(this.playerList.getIpBans());
-            case PROFILE, NAME -> (T) new CraftProfileBanList(this.playerList.getBans());
-        };
-    }
-
-    // Paper start - add BanListType (which has a generic)
-    @SuppressWarnings("unchecked")
-    @Override
-    public <B extends BanList<E>, E> B getBanList(final io.papermc.paper.ban.BanListType<B> type) {
-        Preconditions.checkArgument(type != null, "BanList.BanType cannot be null");
-       if (type == io.papermc.paper.ban.BanListType.IP) {
-           return (B) new CraftIpBanList(this.playerList.getIpBans());
-       } else if (type == io.papermc.paper.ban.BanListType.PROFILE) {
-          return (B) new CraftProfileBanList(this.playerList.getBans());
-       } else {
-           throw new IllegalArgumentException("Unknown BanListType: " + type);
-       }
-    }
-    // Paper end - add BanListType (which has a generic)
-
-    @Override
-    public void setWhitelist(boolean value) {
-        this.playerList.setUsingWhiteList(value);
-        this.console.storeUsingWhiteList(value);
-    }
-
-    @Override
-    public boolean isWhitelistEnforced() {
-        return this.console.isEnforceWhitelist();
-    }
-
-    @Override
-    public void setWhitelistEnforced(boolean value) {
-        this.console.setEnforceWhitelist(value);
-    }
-
-    @Override
-    public Set<OfflinePlayer> getWhitelistedPlayers() {
-        Set<OfflinePlayer> result = new LinkedHashSet<OfflinePlayer>();
-
-        for (UserWhiteListEntry entry : this.playerList.getWhiteList().getEntries()) {
-            result.add(this.getOfflinePlayer(entry.getUser()));
-        }
-
-        return result;
-    }
-
-    @Override
-    public Set<OfflinePlayer> getOperators() {
-        Set<OfflinePlayer> result = new HashSet<OfflinePlayer>();
-
-        for (ServerOpListEntry entry : this.playerList.getOps().getEntries()) {
-            result.add(this.getOfflinePlayer(entry.getUser()));
-        }
-
-        return result;
-    }
-
-    @Override
-    public void reloadWhitelist() {
-        this.playerList.reloadWhiteList();
     }
 
     @Override

@@ -1,15 +1,10 @@
 package org.bukkit;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
 import java.util.UUID;
-import org.bukkit.ban.ProfileBanList;
 import org.bukkit.configuration.serialization.ConfigurationSerializable;
 import org.bukkit.entity.AnimalTamer;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
-import org.bukkit.permissions.ServerOperator;
 import org.bukkit.profile.PlayerProfile;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -20,11 +15,10 @@ import org.jspecify.annotations.Nullable;
  * player needing to be online.
  */
 @NullMarked
-public interface OfflinePlayer extends ServerOperator, AnimalTamer, ConfigurationSerializable, io.papermc.paper.persistence.PersistentDataViewHolder { // Paper - Add Offline PDC API
+public interface OfflinePlayer extends AnimalTamer, ConfigurationSerializable, io.papermc.paper.persistence.PersistentDataViewHolder { // Paper - Add Offline PDC API
 
     /**
      * Checks if this player is currently online
-     *
      * It should be noted that this will return true if any instance of this player is
      * online! This instance may have disconnected. If you wish to check if this specific
      * instance of the player is still online, see {@link OfflinePlayer#isConnected()}.
@@ -75,131 +69,6 @@ public interface OfflinePlayer extends ServerOperator, AnimalTamer, Configuratio
      * @return the player's profile
      */
     com.destroystokyo.paper.profile.PlayerProfile getPlayerProfile(); // Paper
-
-    /**
-     * Checks if this player has had their profile banned.
-     *
-     * @return true if banned, otherwise false
-     */
-    public boolean isBanned();
-    // Paper start
-    /**
-     * Permanently Bans this player from the server
-     *
-     * @param reason Reason for Ban
-     * @return Ban Entry
-     * @deprecated use {@link #ban(String, Date, String)}
-     */
-    @Deprecated(since = "1.20.4")
-    public default BanEntry banPlayer(@Nullable String reason) {
-        return banPlayer(reason, null, null);
-    }
-
-    /**
-     * Permanently Bans this player from the server
-     * @param reason Reason for Ban
-     * @param source Source of the ban, or null for default
-     * @return Ban Entry
-     * @deprecated use {@link #ban(String, Date, String)}
-     */
-    @Deprecated(since = "1.20.4")
-    public default BanEntry banPlayer(@Nullable String reason, @Nullable String source) {
-        return banPlayer(reason, null, source);
-    }
-
-    /**
-     * Bans this player from the server
-     * @param reason Reason for Ban
-     * @param expires When to expire the ban
-     * @return Ban Entry
-     * @deprecated use {@link #ban(String, Date, String)}
-     */
-    @Deprecated(since = "1.20.4")
-    public default BanEntry banPlayer(@Nullable String reason, java.util.@Nullable Date expires) {
-        return banPlayer(reason, expires, null);
-    }
-
-    /**
-     * Bans this player from the server
-     * @param reason Reason for Ban
-     * @param expires When to expire the ban
-     * @param source Source of the ban or null for default
-     * @return Ban Entry
-     * @deprecated use {@link #ban(String, Date, String)}
-     */
-    @Deprecated(since = "1.20.4")
-    public default BanEntry banPlayer(@Nullable String reason, java.util.@Nullable Date expires, @Nullable String source) {
-        return banPlayer(reason, expires, source, true);
-    }
-
-    /**
-     * @deprecated use {@link #ban(String, Date, String)}
-     */
-    @Deprecated(since = "1.20.4")
-    public default BanEntry banPlayer(@Nullable String reason, java.util.@Nullable Date expires, @Nullable String source, boolean kickIfOnline) {
-        BanEntry banEntry = Bukkit.getServer().getBanList(BanList.Type.NAME).addBan(getName(), reason, expires, source);
-        if (kickIfOnline && isOnline()) {
-            getPlayer().kickPlayer(reason);
-        }
-        return banEntry;
-    }
-    // Paper end
-
-    /**
-     * Adds this user to the {@link ProfileBanList}. If a previous ban exists, this will
-     * update the entry.
-     *
-     * @param reason reason for the ban, null indicates implementation default
-     * @param expires date for the ban's expiration (unban), or null to imply
-     *     forever
-     * @param source source of the ban, null indicates implementation default
-     * @return the entry for the newly created ban, or the entry for the
-     *     (updated) previous ban
-     */
-    @Nullable
-    public <E extends BanEntry<? super com.destroystokyo.paper.profile.PlayerProfile>> E ban(@Nullable String reason, @Nullable Date expires, @Nullable String source); // Paper - fix ban list API
-
-    /**
-     * Adds this user to the {@link ProfileBanList}. If a previous ban exists, this will
-     * update the entry.
-     *
-     * @param reason reason for the ban, null indicates implementation default
-     * @param expires instant for the ban's expiration (unban), or null to imply
-     *     forever
-     * @param source source of the ban, null indicates implementation default
-     * @return the entry for the newly created ban, or the entry for the
-     *     (updated) previous ban
-     */
-    @Nullable
-    public <E extends BanEntry<? super com.destroystokyo.paper.profile.PlayerProfile>> E ban(@Nullable String reason, @Nullable Instant expires, @Nullable String source); // Paper - fix ban list API
-
-    /**
-     * Adds this user to the {@link ProfileBanList}. If a previous ban exists, this will
-     * update the entry.
-     *
-     * @param reason reason for the ban, null indicates implementation default
-     * @param duration how long the ban last, or null to imply
-     *     forever
-     * @param source source of the ban, null indicates implementation default
-     * @return the entry for the newly created ban, or the entry for the
-     *     (updated) previous ban
-     */
-    @Nullable
-    public <E extends BanEntry<? super com.destroystokyo.paper.profile.PlayerProfile>> E ban(@Nullable String reason, @Nullable Duration duration, @Nullable String source); // Paper - fix ban list API
-
-    /**
-     * Checks if this player is whitelisted or not
-     *
-     * @return true if whitelisted
-     */
-    public boolean isWhitelisted();
-
-    /**
-     * Sets if this player is whitelisted or not
-     *
-     * @param value true if whitelisted
-     */
-    public void setWhitelisted(boolean value);
 
     /**
      * Gets a {@link Player} object that this represents, if there is one

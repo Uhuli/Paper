@@ -16,15 +16,12 @@ import it.unimi.dsi.fastutil.shorts.ShortSet;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -98,7 +95,6 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.server.players.UserWhiteListEntry;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -114,8 +110,6 @@ import net.minecraft.world.level.border.BorderChangeListener;
 import net.minecraft.world.level.saveddata.maps.MapDecoration;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import org.bukkit.BanEntry;
-import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.DyeColor;
 import org.bukkit.Effect;
@@ -134,8 +128,6 @@ import org.bukkit.Sound;
 import org.bukkit.Statistic;
 import org.bukkit.WeatherType;
 import org.bukkit.WorldBorder;
-import org.bukkit.ban.IpBanList;
-import org.bukkit.ban.ProfileBanList;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Sign;
@@ -242,24 +234,6 @@ public class CraftPlayer extends CraftHumanEntity implements Player {
         } else {
             super.remove();
         }
-    }
-
-    @Override
-    public boolean isOp() {
-        return this.server.getHandle().isOp(this.getProfile());
-    }
-
-    @Override
-    public void setOp(boolean value) {
-        if (value == this.isOp()) return;
-
-        if (value) {
-            this.server.getHandle().op(this.getProfile());
-        } else {
-            this.server.getHandle().deop(this.getProfile());
-        }
-
-        this.perm.recalculatePermissions();
     }
 
     @Override
@@ -1769,79 +1743,6 @@ public class CraftPlayer extends CraftHumanEntity implements Player {
     @Override
     public void resetPlayerWeather() {
         this.getHandle().resetPlayerWeather();
-    }
-
-    @Override
-    public boolean isBanned() {
-        return ((ProfileBanList) this.server.getBanList(BanList.Type.PROFILE)).isBanned(this.getPlayerProfile());
-    }
-
-    @Override
-    public BanEntry<com.destroystokyo.paper.profile.PlayerProfile> ban(String reason, Date expires, String source) { // Paper - fix ban list API
-        return this.ban(reason, expires, source, true);
-    }
-
-    @Override
-    public BanEntry<com.destroystokyo.paper.profile.PlayerProfile> ban(String reason, Instant expires, String source) { // Paper - fix ban list API
-        return this.ban(reason, expires != null ? Date.from(expires) : null, source);
-    }
-
-    @Override
-    public BanEntry<com.destroystokyo.paper.profile.PlayerProfile> ban(String reason, Duration duration, String source) { // Paper - fix ban list API
-        return this.ban(reason, duration != null ? Instant.now().plus(duration) : null, source);
-    }
-
-    @Override
-    public BanEntry<com.destroystokyo.paper.profile.PlayerProfile> ban(String reason, Date expires, String source, boolean kickPlayer) { // Paper - fix ban list API
-        BanEntry<com.destroystokyo.paper.profile.PlayerProfile> banEntry = ((ProfileBanList) this.server.getBanList(BanList.Type.PROFILE)).addBan(this.getPlayerProfile(), reason, expires, source); // Paper - fix ban list API
-        if (kickPlayer) {
-            this.kickPlayer(reason);
-        }
-        return banEntry;
-    }
-
-    @Override
-    public BanEntry<com.destroystokyo.paper.profile.PlayerProfile> ban(String reason, Instant instant, String source, boolean kickPlayer) { // Paper - fix ban list API
-        return this.ban(reason, instant != null ? Date.from(instant) : null, source, kickPlayer);
-    }
-
-    @Override
-    public BanEntry<com.destroystokyo.paper.profile.PlayerProfile> ban(String reason, Duration duration, String source, boolean kickPlayer) { // Paper - fix ban list API
-        return this.ban(reason, duration != null ? Instant.now().plus(duration) : null, source, kickPlayer);
-    }
-
-    @Override
-    public BanEntry<InetAddress> banIp(String reason, Date expires, String source, boolean kickPlayer) {
-        Preconditions.checkArgument(this.getAddress() != null, "The Address of this Player is null");
-        BanEntry<InetAddress> banEntry = ((IpBanList) this.server.getBanList(BanList.Type.IP)).addBan(this.getAddress().getAddress(), reason, expires, source);
-        if (kickPlayer) {
-            this.kickPlayer(reason);
-        }
-        return banEntry;
-    }
-
-    @Override
-    public BanEntry<InetAddress> banIp(String reason, Instant instant, String source, boolean kickPlayer) {
-        return this.banIp(reason, instant != null ? Date.from(instant) : null, source, kickPlayer);
-    }
-
-    @Override
-    public BanEntry<InetAddress> banIp(String reason, Duration duration, String source, boolean kickPlayer) {
-        return this.banIp(reason, duration != null ? Instant.now().plus(duration) : null, source, kickPlayer);
-    }
-
-    @Override
-    public boolean isWhitelisted() {
-        return this.server.getHandle().getWhiteList().isWhiteListed(this.getProfile());
-    }
-
-    @Override
-    public void setWhitelisted(boolean value) {
-        if (value) {
-            this.server.getHandle().getWhiteList().add(new UserWhiteListEntry(this.getProfile()));
-        } else {
-            this.server.getHandle().getWhiteList().remove(this.getProfile());
-        }
     }
 
     @Override

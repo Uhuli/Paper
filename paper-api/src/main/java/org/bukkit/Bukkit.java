@@ -402,65 +402,6 @@ public final class Bukkit {
     }
 
     /**
-     * Gets whether this server has a whitelist or not.
-     *
-     * @return whether this server has a whitelist or not
-     */
-    public static boolean hasWhitelist() {
-        return server.hasWhitelist();
-    }
-
-    /**
-     * Sets if the server is whitelisted.
-     *
-     * @param value true for whitelist on, false for off
-     */
-    public static void setWhitelist(boolean value) {
-        server.setWhitelist(value);
-    }
-
-    /**
-     * Gets whether the server whitelist is enforced.
-     *
-     * If the whitelist is enforced, non-whitelisted players will be
-     * disconnected when the server whitelist is reloaded.
-     *
-     * @return whether the server whitelist is enforced
-     */
-    public static boolean isWhitelistEnforced() {
-        return server.isWhitelistEnforced();
-    }
-
-    /**
-     * Sets if the server whitelist is enforced.
-     *
-     * If the whitelist is enforced, non-whitelisted players will be
-     * disconnected when the server whitelist is reloaded.
-     *
-     * @param value true for enforced, false for not
-     */
-    public static void setWhitelistEnforced(boolean value) {
-        server.setWhitelistEnforced(value);
-    }
-
-    /**
-     * Gets a list of whitelisted players.
-     *
-     * @return a set containing all whitelisted players
-     */
-    @NotNull
-    public static Set<OfflinePlayer> getWhitelistedPlayers() {
-        return server.getWhitelistedPlayers();
-    }
-
-    /**
-     * Reloads the whitelist from disk.
-     */
-    public static void reloadWhitelist() {
-        server.reloadWhitelist();
-    }
-
-    /**
      * Broadcast a message to all players.
      * <p>
      * This is the same as calling {@link #broadcast(java.lang.String,
@@ -1031,21 +972,6 @@ public final class Bukkit {
     }
     // Paper end
 
-    /**
-     * Reloads the server, refreshing settings and plugin information.
-     */
-    public static void reload() {
-        server.reload();
-    }
-
-    /**
-     * Reload only the Minecraft data for the server. This includes custom
-     * advancements and loot tables.
-     */
-    public static void reloadData() {
-        server.reloadData();
-    }
-
     // Paper start - update reloadable data
     /**
      * Updates all advancement, tag, and recipe data for all connected clients.
@@ -1311,13 +1237,6 @@ public final class Bukkit {
      */
     public static void clearRecipes() {
         server.clearRecipes();
-    }
-
-    /**
-     * Resets the list of crafting recipes to the default.
-     */
-    public static void resetRecipes() {
-        server.resetRecipes();
     }
 
     /**
@@ -1598,107 +1517,6 @@ public final class Bukkit {
     @Deprecated(since = "1.18.1") // Paper
     public static PlayerProfile createPlayerProfile(@NotNull String name) {
         return server.createPlayerProfile(name);
-    }
-
-    /**
-     * Gets a set containing all current IPs that are banned.
-     *
-     * @return a set containing banned IP addresses
-     */
-    @NotNull
-    public static Set<String> getIPBans() {
-        return server.getIPBans();
-    }
-
-    /**
-     * Bans the specified address from the server.
-     *
-     * @param address the IP address to ban
-     *
-     * @deprecated see {@link #banIP(InetAddress)}
-     */
-    @Deprecated(since = "1.20.1")
-    public static void banIP(@NotNull String address) {
-        server.banIP(address);
-    }
-
-    /**
-     * Unbans the specified address from the server.
-     *
-     * @param address the IP address to unban
-     *
-     * @deprecated see {@link #unbanIP(InetAddress)}
-     */
-    @Deprecated(since = "1.20.1")
-    public static void unbanIP(@NotNull String address) {
-        server.unbanIP(address);
-    }
-
-    /**
-     * Bans the specified address from the server.
-     *
-     * @param address the IP address to ban
-     */
-    public static void banIP(@NotNull InetAddress address) {
-        server.banIP(address);
-    }
-
-    /**
-     * Unbans the specified address from the server.
-     *
-     * @param address the IP address to unban
-     */
-    public static void unbanIP(@NotNull InetAddress address) {
-        server.unbanIP(address);
-    }
-
-    /**
-     * Gets a set containing all banned players.
-     *
-     * @return a set containing banned players
-     */
-    @NotNull
-    public static Set<OfflinePlayer> getBannedPlayers() {
-        return server.getBannedPlayers();
-    }
-
-    /**
-     * Gets a ban list for the supplied type.
-     *
-     * @param type the type of list to fetch, cannot be null
-     * @param <T> The ban target
-     *
-     * @return a ban list of the specified type
-     * @deprecated use {@link #getBanList(io.papermc.paper.ban.BanListType)} to enforce the correct return value at compile time.
-     */
-    @NotNull
-    @Deprecated(since = "1.20.4") // Paper - add BanListType (which has a generic)
-    public static <T extends BanList<?>> T getBanList(@NotNull BanList.Type type) {
-        return server.getBanList(type);
-    }
-    // Paper start - add BanListType (which has a generic)
-    /**
-     * Gets a ban list for the supplied type.
-     *
-     * @param type the type of list to fetch, cannot be null
-     * @param <B> The ban target
-     *
-     * @return a ban list of the specified type
-     */
-    @NotNull
-    public static <B extends BanList<E>, E> B getBanList(final io.papermc.paper.ban.@NotNull BanListType<B> type) {
-        return server.getBanList(type);
-    }
-    // Paper end - add BanListType (which has a generic)
-
-    /**
-     * Gets a set containing all player operators.
-     *
-     * @return a set containing player operators
-     */
-    @NotNull
-    public static Set<OfflinePlayer> getOperators() {
-        return server.getOperators();
     }
 
     /**
