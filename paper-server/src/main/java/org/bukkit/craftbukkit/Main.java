@@ -40,7 +40,7 @@ public class Main {
                 this.acceptsAll(Main.asList("c", "config"), "Properties file to use")
                         .withRequiredArg()
                         .ofType(File.class)
-                        .defaultsTo(new File("server.properties"))
+                        .defaultsTo(new File("config/server.properties"))
                         .describedAs("Properties file");
 
                 this.acceptsAll(Main.asList("P", "plugins"), "Plugin directory to use")
@@ -123,7 +123,7 @@ public class Main {
                 this.acceptsAll(Main.asList("b", "bukkit-settings"), "File for bukkit settings")
                         .withRequiredArg()
                         .ofType(File.class)
-                        .defaultsTo(new File("bukkit.yml"))
+                        .defaultsTo(new File("config/bukkit.yml"))
                         .describedAs("Yml file");
 
                 this.acceptsAll(Main.asList("forceUpgrade"), "Whether to force a world upgrade");
@@ -146,7 +146,7 @@ public class Main {
                 this.acceptsAll(Main.asList("S", "spigot-settings"), "File for spigot settings")
                         .withRequiredArg()
                         .ofType(File.class)
-                        .defaultsTo(new File("spigot.yml"))
+                        .defaultsTo(new File("config/spigot.yml"))
                         .describedAs("Yml file");
                 // Spigot end
 
