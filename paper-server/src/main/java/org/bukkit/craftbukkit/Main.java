@@ -7,7 +7,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import joptsimple.OptionParser;
@@ -125,12 +124,6 @@ public class Main {
                         .withRequiredArg()
                         .ofType(File.class)
                         .defaultsTo(new File("bukkit.yml"))
-                        .describedAs("Yml file");
-
-                this.acceptsAll(Main.asList("C", "commands-settings"), "File for command settings")
-                        .withRequiredArg()
-                        .ofType(File.class)
-                        .defaultsTo(new File("commands.yml"))
                         .describedAs("Yml file");
 
                 this.acceptsAll(Main.asList("forceUpgrade"), "Whether to force a world upgrade");

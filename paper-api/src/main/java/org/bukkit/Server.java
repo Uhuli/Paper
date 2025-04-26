@@ -2246,8 +2246,6 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
 
     void reloadPermissions(); // Paper
 
-    boolean reloadCommandAliases(); // Paper
-
     // Paper start - allow preventing player name suggestions by default
     /**
      * Checks if player names should be suggested when a command returns {@code null} as

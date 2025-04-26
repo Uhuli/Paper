@@ -274,7 +274,6 @@ public final class CraftServer implements Server {
     private final Map<String, World> worlds = new LinkedHashMap<String, World>();
     // private final Map<Class<?>, Registry<?>> registries = new HashMap<>(); // Paper - replace with RegistryAccess
     private YamlConfiguration configuration;
-    private YamlConfiguration commandsConfiguration;
     private final Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
     private final Map<UUID, OfflinePlayer> offlinePlayers = new MapMaker().weakValues().makeMap();
     private final EntityMetadataStore entityMetadata = new EntityMetadataStore();
@@ -291,8 +290,6 @@ public final class CraftServer implements Server {
     public boolean playerCommandState;
     private boolean printSaveWarning;
     private CraftIconCache icon;
-    private boolean overrideAllCommandBlockCommands = false;
-    public boolean ignoreVanillaPermissions = false;
     private final List<CraftPlayer> playerView;
     public int reloadCount;
     public Set<String> activeCompatibilities = Collections.emptySet();
@@ -424,45 +421,7 @@ public final class CraftServer implements Server {
         this.configuration = YamlConfiguration.loadConfiguration(this.getConfigFile());
         this.configuration.options().copyDefaults(true);
         this.configuration.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("configurations/bukkit.yml"), Charsets.UTF_8)));
-        ConfigurationSection legacyAlias = null;
-        if (!this.configuration.isString("aliases")) {
-            legacyAlias = this.configuration.getConfigurationSection("aliases");
-            this.configuration.set("aliases", "now-in-commands.yml");
-        }
         this.saveConfig();
-        if (this.getCommandsConfigFile().isFile()) {
-            legacyAlias = null;
-        }
-        this.commandsConfiguration = YamlConfiguration.loadConfiguration(this.getCommandsConfigFile());
-        this.commandsConfiguration.options().copyDefaults(true);
-        // Paper start - don't enforce icanhasbukkit default if alias block exists
-        final YamlConfiguration commandsDefaults = YamlConfiguration.loadConfiguration(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("configurations/commands.yml"), Charsets.UTF_8));
-        if (this.commandsConfiguration.contains("aliases")) commandsDefaults.set("aliases", null);
-        this.commandsConfiguration.setDefaults(commandsDefaults);
-        // Paper end - don't enforce icanhasbukkit default if alias block exists
-        this.saveCommandsConfig();
-
-        // Migrate aliases from old file and add previously implicit $1- to pass all arguments
-        if (legacyAlias != null) {
-            ConfigurationSection aliases = this.commandsConfiguration.createSection("aliases");
-            for (String key : legacyAlias.getKeys(false)) {
-                ArrayList<String> commands = new ArrayList<String>();
-
-                if (legacyAlias.isList(key)) {
-                    for (String command : legacyAlias.getStringList(key)) {
-                        commands.add(command + " $1-");
-                    }
-                } else {
-                    commands.add(legacyAlias.getString(key) + " $1-");
-                }
-
-                aliases.set(key, commands);
-            }
-        }
-
-        this.saveCommandsConfig();
-        this.overrideAllCommandBlockCommands = this.commandsConfiguration.getStringList("command-block-overrides").contains("*");
-        this.ignoreVanillaPermissions = this.commandsConfiguration.getBoolean("ignore-vanilla-permissions");
         this.overrideSpawnLimits();
         console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
         this.warningState = WarningState.value(this.configuration.getString("settings.deprecated-verbose"));
@@ -482,15 +441,11 @@ public final class CraftServer implements Server {
     }
 
     public boolean getCommandBlockOverride(String command) {
-        return this.overrideAllCommandBlockCommands || this.commandsConfiguration.getStringList("command-block-overrides").contains(command);
+        return false;
     }
 
     private File getConfigFile() {
         return (File) this.console.options.valueOf("bukkit-settings");
-    }
-
-    private File getCommandsConfigFile() {
-        return (File) this.console.options.valueOf("commands-settings");
     }
 
     private void overrideSpawnLimits() {
@@ -506,14 +461,6 @@ public final class CraftServer implements Server {
             this.configuration.save(this.getConfigFile());
         } catch (IOException ex) {
             Logger.getLogger(CraftServer.class.getName()).log(Level.SEVERE, "Could not save " + this.getConfigFile(), ex);
-        }
-    }
-
-    private void saveCommandsConfig() {
-        try {
-            this.commandsConfiguration.save(this.getCommandsConfigFile());
-        } catch (IOException ex) {
-            Logger.getLogger(CraftServer.class.getName()).log(Level.SEVERE, "Could not save " + this.getCommandsConfigFile(), ex);
         }
     }
 
@@ -581,7 +528,6 @@ public final class CraftServer implements Server {
     public void enablePlugins(PluginLoadOrder type) {
         if (type == PluginLoadOrder.STARTUP) {
             this.helpMap.clear();
-            this.helpMap.initializeGeneralTopics();
             if (io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) loadCustomPermissions(); // Paper
         }
 
@@ -1704,24 +1650,7 @@ public final class CraftServer implements Server {
 
     @Override
     public Map<String, String[]> getCommandAliases() {
-        ConfigurationSection section = this.commandsConfiguration.getConfigurationSection("aliases");
-        Map<String, String[]> result = new LinkedHashMap<String, String[]>();
-
-        if (section != null) {
-            for (String key : section.getKeys(false)) {
-                List<String> commands;
-
-                if (section.isList(key)) {
-                    commands = section.getStringList(key);
-                } else {
-                    commands = ImmutableList.of(section.getString(key));
-                }
-
-                result.put(key, commands.toArray(new String[commands.size()]));
-            }
-        }
-
-        return result;
+        return new LinkedHashMap<>();
     }
 
     @Override
@@ -2931,25 +2860,6 @@ public final class CraftServer implements Server {
     }
 
     @Override
-    public boolean reloadCommandAliases() {
-        Set<String> removals = getCommandAliases().keySet().stream()
-                .map(key -> key.toLowerCase(java.util.Locale.ENGLISH))
-                .collect(java.util.stream.Collectors.toSet());
-        getCommandMap().getKnownCommands().keySet().removeIf(removals::contains);
-        File file = getCommandsConfigFile();
-        try {
-            commandsConfiguration.load(file);
-        } catch (FileNotFoundException ex) {
-            return false;
-        } catch (IOException | org.bukkit.configuration.InvalidConfigurationException ex) {
-            Bukkit.getLogger().log(Level.SEVERE, "Cannot load " + file, ex);
-            return false;
-        }
-        commandMap.registerServerAliases();
-        return true;
-    }
-
-    @Override
     public boolean suggestPlayerNamesWhenNullTabCompletions() {
         return io.papermc.paper.configuration.GlobalConfiguration.get().commands.suggestPlayerNamesWhenNullTabCompletions;
     }
@@ -2963,6 +2873,7 @@ public final class CraftServer implements Server {
     public net.kyori.adventure.text.Component permissionMessage() {
         return io.papermc.paper.configuration.GlobalConfiguration.get().messages.noPermission;
     }
+
 
     @Override
     public com.destroystokyo.paper.profile.PlayerProfile createProfile(@Nonnull UUID uuid) {
