@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mika <Mika@zestnik.de>
+Date: Sat, 26 Apr 2025 21:19:48 +0200
+Subject: [PATCH] moved server.properties in config folder
+
+
+diff --git a/net/minecraft/server/Main.java b/net/minecraft/server/Main.java
+index 346ea78649e9bed8196e66091c23b63824b30a88..451862816b5e7bc98267fb120ff04e3c21eebc47 100644
+--- a/net/minecraft/server/Main.java
++++ b/net/minecraft/server/Main.java
+@@ -106,7 +106,7 @@ public class Main {
+             Bootstrap.bootStrap();
+             Bootstrap.validate();
+             Util.startTimerHackThread();
+-            Path path1 = Paths.get("server.properties");
++            Path path1 = Paths.get("config/server.properties");
+             DedicatedServerSettings dedicatedServerSettings = new DedicatedServerSettings(optionSet); // CraftBukkit - CLI argument support
+             dedicatedServerSettings.forceSave();
+             RegionFileVersion.configure(dedicatedServerSettings.getProperties().regionFileComression);
