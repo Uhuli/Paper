@@ -528,7 +528,6 @@ public final class CraftServer implements Server {
     public void enablePlugins(PluginLoadOrder type) {
         if (type == PluginLoadOrder.STARTUP) {
             this.helpMap.clear();
-            if (io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) loadCustomPermissions(); // Paper
         }
 
         Plugin[] plugins = this.pluginManager.getPlugins();
@@ -548,7 +547,6 @@ public final class CraftServer implements Server {
             this.commandMap.registerServerAliases();
             DefaultPermissions.registerCorePermissions();
             CraftDefaultPermissions.registerCorePermissions();
-            if (!io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) this.loadCustomPermissions(); // Paper
             this.syncCommands();
         }
     }
@@ -1020,53 +1018,6 @@ public final class CraftServer implements Server {
             }
         } catch (Exception ex) {
             this.getLogger().log(Level.WARNING, "Couldn't load server icon", ex);
-        }
-    }
-
-    @SuppressWarnings({ "unchecked", "finally" })
-    private void loadCustomPermissions() {
-        File file = new File(this.configuration.getString("settings.permissions-file"));
-        FileInputStream stream;
-
-        try {
-            stream = new FileInputStream(file);
-        } catch (FileNotFoundException ex) {
-            try {
-                file.createNewFile();
-            } finally {
-                return;
-            }
-        }
-
-        Map<String, Map<String, Object>> perms;
-
-        try {
-            perms = (Map<String, Map<String, Object>>) this.yaml.load(stream);
-        } catch (MarkedYAMLException ex) {
-            this.getLogger().log(Level.WARNING, "Server permissions file " + file + " is not valid YAML: " + ex.toString());
-            return;
-        } catch (Throwable ex) {
-            this.getLogger().log(Level.WARNING, "Server permissions file " + file + " is not valid YAML.", ex);
-            return;
-        } finally {
-            try {
-                stream.close();
-            } catch (IOException ex) {}
-        }
-
-        if (perms == null) {
-            this.getLogger().log(Level.INFO, "Server permissions file " + file + " is empty, ignoring it");
-            return;
-        }
-
-        List<Permission> permsList = Permission.loadPermissions(perms, "Permission node '%s' in " + file + " is invalid", Permission.DEFAULT_PERMISSION);
-
-        for (Permission perm : permsList) {
-            try {
-                this.pluginManager.addPermission(perm);
-            } catch (IllegalArgumentException ex) {
-                this.getLogger().log(Level.SEVERE, "Permission in " + file + " was already defined", ex);
-            }
         }
     }
 
@@ -2843,7 +2794,6 @@ public final class CraftServer implements Server {
     @Override
     public void reloadPermissions() {
         pluginManager.clearPermissions();
-        if (io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) loadCustomPermissions();
         for (Plugin plugin : pluginManager.getPlugins()) {
             for (Permission perm : plugin.getDescription().getPermissions()) {
                 try {
@@ -2853,7 +2803,6 @@ public final class CraftServer implements Server {
                 }
             }
         }
-        if (!io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) loadCustomPermissions();
         DefaultPermissions.registerCorePermissions();
         CraftDefaultPermissions.registerCorePermissions();
     }
