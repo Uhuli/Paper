@@ -1,0 +1,463 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mika <Mika@zestnik.de>
+Date: Sat, 26 Apr 2025 21:59:57 +0200
+Subject: [PATCH] added StopCommand
+
+
+diff --git a/net/minecraft/commands/Commands.java b/net/minecraft/commands/Commands.java
+index e591b8ffad810836dcd0af73c87e92027c693c7f..4bd54fb857fdbaad95722fa0e0498bfb6f192685 100644
+--- a/net/minecraft/commands/Commands.java
++++ b/net/minecraft/commands/Commands.java
+@@ -57,6 +57,7 @@ import net.minecraft.server.commands.ParticleCommand;
+ import net.minecraft.server.commands.PlaySoundCommand;
+ import net.minecraft.server.commands.SaveAllCommand;
+ import net.minecraft.server.commands.SetWorldSpawnCommand;
++import net.minecraft.server.commands.StopCommand;
+ import net.minecraft.server.commands.SummonCommand;
+ import net.minecraft.server.commands.TagCommand;
+ import net.minecraft.server.commands.TickCommand;
+@@ -74,19 +75,22 @@ import net.minecraft.world.level.GameRules;
+ import org.slf4j.Logger;
+ 
+ public class Commands {
+-    private static final ThreadLocal<ExecutionContext<CommandSourceStack>> CURRENT_EXECUTION_CONTEXT = new ThreadLocal<>();
+-    private static final Logger LOGGER = LogUtils.getLogger();
+     public static final int LEVEL_ALL = 0;
+     public static final int LEVEL_MODERATORS = 1;
+     public static final int LEVEL_GAMEMASTERS = 2;
+     public static final int LEVEL_ADMINS = 3;
+     public static final int LEVEL_OWNERS = 4;
++    // Fixed pool, but with discard policy
++    public static final java.util.concurrent.ExecutorService COMMAND_SENDING_POOL = new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, java.util.concurrent.TimeUnit.MILLISECONDS, new java.util.concurrent.LinkedBlockingQueue<>(), new com.google.common.util.concurrent.ThreadFactoryBuilder().setNameFormat("Paper Async Command Builder Thread Pool - %1$d").setUncaughtExceptionHandler(new net.minecraft.DefaultUncaughtExceptionHandlerWithName(net.minecraft.server.MinecraftServer.LOGGER)).build(), new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
++    private static final ThreadLocal<ExecutionContext<CommandSourceStack>> CURRENT_EXECUTION_CONTEXT = new ThreadLocal<>();
++    private static final Logger LOGGER = LogUtils.getLogger();
+     private final CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+ 
+     public Commands(Commands.CommandSelection selection, CommandBuildContext context) {
+         // Paper start - Brigadier API - modern minecraft overloads that do not use redirects but are copies instead
+         this(selection, context, false);
+     }
++
+     public Commands(Commands.CommandSelection selection, CommandBuildContext context, final boolean modern) {
+         // Paper end - Brigadier API - modern minecraft overloads that do not use redirects but are copies instead
+         AttributeCommand.register(this.dispatcher, context);
+@@ -104,6 +108,7 @@ public class Commands {
+         ParticleCommand.register(this.dispatcher, context);
+         PlaySoundCommand.register(this.dispatcher);
+         SetWorldSpawnCommand.register(this.dispatcher);
++        StopCommand.register(this.dispatcher);
+         SummonCommand.register(this.dispatcher, context);
+         TagCommand.register(this.dispatcher);
+         TickCommand.register(this.dispatcher);
+@@ -129,25 +134,17 @@ public class Commands {
+             if (modern) {
+                 // Modern behaviour that simply creates a full copy of the commands node.
+                 // Avoids plenty of issues around registering redirects *to* these nodes from the API
+-                this.dispatcher.getRoot().addChild(
+-                    io.papermc.paper.command.brigadier.PaperBrigadier.copyLiteral(
+-                        "minecraft:" + node.getName(),
+-                        (com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack>) node
+-                    )
+-                );
++                this.dispatcher.getRoot().addChild(io.papermc.paper.command.brigadier.PaperBrigadier.copyLiteral("minecraft:" + node.getName(), (com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack>) node));
+                 continue;
+             }
+ 
+             // Legacy behaviour of creating a flattened redirecting node.
+             // Used by CommandArgumentUpgrader
+             CommandNode<CommandSourceStack> flattenedAliasTarget = node;
+-            while (flattenedAliasTarget.getRedirect() != null) flattenedAliasTarget = flattenedAliasTarget.getRedirect();
++            while (flattenedAliasTarget.getRedirect() != null)
++                flattenedAliasTarget = flattenedAliasTarget.getRedirect();
+ 
+-            this.dispatcher.register(
+-                com.mojang.brigadier.builder.LiteralArgumentBuilder.<CommandSourceStack>literal("minecraft:" + node.getName())
+-                    .executes(flattenedAliasTarget.getCommand())
+-                    .requires(flattenedAliasTarget.getRequirement())
+-                    .redirect(flattenedAliasTarget));
++            this.dispatcher.register(com.mojang.brigadier.builder.LiteralArgumentBuilder.<CommandSourceStack>literal("minecraft:" + node.getName()).executes(flattenedAliasTarget.getCommand()).requires(flattenedAliasTarget.getRequirement()).redirect(flattenedAliasTarget));
+         }
+         // Paper end - Brigadier Command API
+         this.dispatcher.setConsumer(ExecutionCommandSource.resultConsumer());
+@@ -158,6 +155,116 @@ public class Commands {
+         CommandContextBuilder<S> commandContextBuilder = context.withSource(mapper.apply(context.getSource()));
+         return new ParseResults<>(commandContextBuilder, parseResults.getReader(), parseResults.getExceptions());
+     }
++    // CraftBukkit end
++
++    public static void executeCommandInContext(CommandSourceStack source, Consumer<ExecutionContext<CommandSourceStack>> contextConsumer) {
++        MinecraftServer server = source.getServer();
++        ExecutionContext<CommandSourceStack> executionContext = CURRENT_EXECUTION_CONTEXT.get();
++        boolean flag = executionContext == null;
++        if (flag) {
++            int max = Math.max(1, server.getGameRules().getInt(GameRules.RULE_MAX_COMMAND_CHAIN_LENGTH));
++            int _int = server.getGameRules().getInt(GameRules.RULE_MAX_COMMAND_FORK_COUNT);
++
++            try (ExecutionContext<CommandSourceStack> executionContext1 = new ExecutionContext<>(max, _int, Profiler.get())) {
++                CURRENT_EXECUTION_CONTEXT.set(executionContext1);
++                contextConsumer.accept(executionContext1);
++                executionContext1.runCommandQueue();
++            } finally {
++                CURRENT_EXECUTION_CONTEXT.set(null);
++            }
++        } else {
++            contextConsumer.accept(executionContext);
++        }
++    }
++
++    public static LiteralArgumentBuilder<CommandSourceStack> literal(String name) {
++        return LiteralArgumentBuilder.literal(name);
++    }
++
++    public static <T> RequiredArgumentBuilder<CommandSourceStack, T> argument(String name, ArgumentType<T> type) {
++        return RequiredArgumentBuilder.argument(name, type);
++    }
++
++    public static Predicate<String> createValidator(Commands.ParseFunction parser) {
++        return contents -> {
++            try {
++                parser.parse(new StringReader(contents));
++                return true;
++            } catch (CommandSyntaxException var3) {
++                return false;
++            }
++        };
++    }
++
++    public static <S> void validateParseResults(ParseResults<S> parseResults) throws CommandSyntaxException {
++        CommandSyntaxException parseException = getParseException(parseResults);
++        if (parseException != null) {
++            throw parseException;
++        }
++    }
++
++    @Nullable
++    public static <S> CommandSyntaxException getParseException(ParseResults<S> result) {
++        if (!result.getReader().canRead()) {
++            return null;
++        } else if (result.getExceptions().size() == 1) {
++            return result.getExceptions().values().iterator().next();
++        } else {
++            return result.getContext().getRange().isEmpty() ? CommandSyntaxException.BUILT_IN_EXCEPTIONS.dispatcherUnknownCommand().createWithContext(result.getReader()) : CommandSyntaxException.BUILT_IN_EXCEPTIONS.dispatcherUnknownArgument().createWithContext(result.getReader());
++        }
++    }
++
++    public static CommandBuildContext createValidationContext(final HolderLookup.Provider provider) {
++        return new CommandBuildContext() {
++            @Override
++            public FeatureFlagSet enabledFeatures() {
++                return FeatureFlags.REGISTRY.allFlags();
++            }
++
++            @Override
++            public Stream<ResourceKey<? extends Registry<?>>> listRegistryKeys() {
++                return provider.listRegistryKeys();
++            }
++
++            @Override
++            public <T> Optional<HolderLookup.RegistryLookup<T>> lookup(ResourceKey<? extends Registry<? extends T>> registryKey) {
++                return provider.lookup(registryKey).map(this::createLookup);
++            }
++
++            private <T> HolderLookup.RegistryLookup.Delegate<T> createLookup(final HolderLookup.RegistryLookup<T> registryLookup) {
++                return new HolderLookup.RegistryLookup.Delegate<T>() {
++                    @Override
++                    public HolderLookup.RegistryLookup<T> parent() {
++                        return registryLookup;
++                    }
++
++                    @Override
++                    public Optional<HolderSet.Named<T>> get(TagKey<T> tagKey) {
++                        return Optional.of(this.getOrThrow(tagKey));
++                    }
++
++                    @Override
++                    public HolderSet.Named<T> getOrThrow(TagKey<T> tagKey) {
++                        Optional<HolderSet.Named<T>> optional = this.parent().get(tagKey);
++                        return optional.orElseGet(() -> HolderSet.emptyNamed(this.parent(), tagKey));
++                    }
++                };
++            }
++        };
++    }
++
++    public static void validate() {
++        CommandBuildContext commandBuildContext = createValidationContext(VanillaRegistries.createLookup());
++        CommandDispatcher<CommandSourceStack> dispatcher = new Commands(Commands.CommandSelection.ALL, commandBuildContext).getDispatcher();
++        RootCommandNode<CommandSourceStack> root = dispatcher.getRoot();
++        dispatcher.findAmbiguities((commandNode, commandNode1, commandNode2, collection) -> LOGGER.warn("Ambiguity between arguments {} and {} with inputs: {}", dispatcher.getPath(commandNode1), dispatcher.getPath(commandNode2), collection));
++        Set<ArgumentType<?>> set = ArgumentUtils.findUsedArgumentTypes(root);
++        Set<ArgumentType<?>> set1 = set.stream().filter(argumentType -> !ArgumentTypeInfos.isClassRecognized(argumentType.getClass())).collect(Collectors.toSet());
++        if (!set1.isEmpty()) {
++            LOGGER.warn("Missing type registration for following arguments:\n {}", set1.stream().map(argumentType -> "\t" + argumentType).collect(Collectors.joining(",\n")));
++            throw new IllegalStateException("Unregistered argument types");
++        }
++    }
+ 
+     // CraftBukkit start
+     public void dispatchServerCommand(CommandSourceStack sender, String command) {
+@@ -183,7 +290,6 @@ public class Commands {
+         String newCommand = joiner.join(args);
+         this.performPrefixedCommand(sender, newCommand, newCommand);
+     }
+-    // CraftBukkit end
+ 
+     public void performPrefixedCommand(CommandSourceStack source, String command) {
+         // CraftBukkit start
+@@ -206,6 +312,7 @@ public class Commands {
+         // Paper start
+         this.performCommand(parseResults, command, label, false);
+     }
++
+     public void performCommand(ParseResults<CommandSourceStack> parseResults, String command, String label, boolean throwCommandError) {
+         // Paper end
+         CommandSourceStack commandSourceStack = parseResults.getContext().getSource();
+@@ -214,12 +321,7 @@ public class Commands {
+ 
+         try {
+             if (contextChain != null) {
+-                executeCommandInContext(
+-                    commandSourceStack,
+-                    executionContext -> ExecutionContext.queueInitialCommandExecution(
+-                        executionContext, command, contextChain, commandSourceStack, CommandResultCallback.EMPTY
+-                    )
+-                );
++                executeCommandInContext(commandSourceStack, executionContext -> ExecutionContext.queueInitialCommandExecution(executionContext, command, contextChain, commandSourceStack, CommandResultCallback.EMPTY));
+             }
+         } catch (Exception var12) {
+             if (throwCommandError) throw var12; // Paper
+@@ -229,19 +331,11 @@ public class Commands {
+                 StackTraceElement[] stackTrace = var12.getStackTrace();
+ 
+                 for (int i = 0; i < Math.min(stackTrace.length, 3); i++) {
+-                    mutableComponent.append("\n\n")
+-                        .append(stackTrace[i].getMethodName())
+-                        .append("\n ")
+-                        .append(stackTrace[i].getFileName())
+-                        .append(":")
+-                        .append(String.valueOf(stackTrace[i].getLineNumber()));
++                    mutableComponent.append("\n\n").append(stackTrace[i].getMethodName()).append("\n ").append(stackTrace[i].getFileName()).append(":").append(String.valueOf(stackTrace[i].getLineNumber()));
+                 }
+             }
+ 
+-            commandSourceStack.sendFailure(
+-                Component.translatable("command.failed")
+-                    .withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, mutableComponent)))
+-            );
++            commandSourceStack.sendFailure(Component.translatable("command.failed").withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, mutableComponent))));
+             if (SharedConstants.IS_RUNNING_IN_IDE) {
+                 commandSourceStack.sendFailure(Component.literal(Util.describeError(var12)));
+                 LOGGER.error("'/{}' threw an exception", command, var12);
+@@ -255,8 +349,7 @@ public class Commands {
+     private ContextChain<CommandSourceStack> finishParsing(ParseResults<CommandSourceStack> parseResults, String command, CommandSourceStack source, String label) { // CraftBukkit // Paper - Add UnknownCommandEvent
+         try {
+             validateParseResults(parseResults);
+-            return ContextChain.tryFlatten(parseResults.getContext().build(command))
+-                .orElseThrow(() -> CommandSyntaxException.BUILT_IN_EXCEPTIONS.dispatcherUnknownCommand().createWithContext(parseResults.getReader()));
++            return ContextChain.tryFlatten(parseResults.getContext().build(command)).orElseThrow(() -> CommandSyntaxException.BUILT_IN_EXCEPTIONS.dispatcherUnknownCommand().createWithContext(parseResults.getReader()));
+         } catch (CommandSyntaxException var7) {
+             // Paper start - Add UnknownCommandEvent
+             final net.kyori.adventure.text.TextComponent.Builder builder = net.kyori.adventure.text.Component.text();
+@@ -265,9 +358,7 @@ public class Commands {
+             // Paper end - Add UnknownCommandEvent
+             if (var7.getInput() != null && var7.getCursor() >= 0) {
+                 int min = Math.min(var7.getInput().length(), var7.getCursor());
+-                MutableComponent mutableComponent = Component.empty()
+-                    .withStyle(ChatFormatting.GRAY)
+-                    .withStyle(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/" + label))); // CraftBukkit // Paper
++                MutableComponent mutableComponent = Component.empty().withStyle(ChatFormatting.GRAY).withStyle(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/" + label))); // CraftBukkit // Paper
+                 if (min > 10) {
+                     mutableComponent.append(CommonComponents.ELLIPSIS);
+                 }
+@@ -281,9 +372,7 @@ public class Commands {
+                 mutableComponent.append(Component.translatable("command.context.here").withStyle(ChatFormatting.RED, ChatFormatting.ITALIC));
+                 // Paper start - Add UnknownCommandEvent
+                 // source.sendFailure(mutableComponent);
+-                builder
+-                    .append(net.kyori.adventure.text.Component.newline())
+-                    .append(io.papermc.paper.adventure.PaperAdventure.asAdventure(mutableComponent));
++                builder.append(net.kyori.adventure.text.Component.newline()).append(io.papermc.paper.adventure.PaperAdventure.asAdventure(mutableComponent));
+             }
+             org.bukkit.event.command.UnknownCommandEvent event = new org.bukkit.event.command.UnknownCommandEvent(source.getBukkitSender(), command, org.spigotmc.SpigotConfig.unknownCommandMessage.isEmpty() ? null : builder.build());
+             org.bukkit.Bukkit.getServer().getPluginManager().callEvent(event);
+@@ -296,26 +385,6 @@ public class Commands {
+         }
+     }
+ 
+-    public static void executeCommandInContext(CommandSourceStack source, Consumer<ExecutionContext<CommandSourceStack>> contextConsumer) {
+-        MinecraftServer server = source.getServer();
+-        ExecutionContext<CommandSourceStack> executionContext = CURRENT_EXECUTION_CONTEXT.get();
+-        boolean flag = executionContext == null;
+-        if (flag) {
+-            int max = Math.max(1, server.getGameRules().getInt(GameRules.RULE_MAX_COMMAND_CHAIN_LENGTH));
+-            int _int = server.getGameRules().getInt(GameRules.RULE_MAX_COMMAND_FORK_COUNT);
+-
+-            try (ExecutionContext<CommandSourceStack> executionContext1 = new ExecutionContext<>(max, _int, Profiler.get())) {
+-                CURRENT_EXECUTION_CONTEXT.set(executionContext1);
+-                contextConsumer.accept(executionContext1);
+-                executionContext1.runCommandQueue();
+-            } finally {
+-                CURRENT_EXECUTION_CONTEXT.set(null);
+-            }
+-        } else {
+-            contextConsumer.accept(executionContext);
+-        }
+-    }
+-
+     public void sendCommands(ServerPlayer player) {
+         // Paper start - Send empty commands if tab completion is disabled
+         if (org.spigotmc.SpigotConfig.tabComplete < 0) {
+@@ -331,17 +400,6 @@ public class Commands {
+         COMMAND_SENDING_POOL.execute(() -> this.sendAsync(player, commandNodes));
+     }
+ 
+-    // Fixed pool, but with discard policy
+-    public static final java.util.concurrent.ExecutorService COMMAND_SENDING_POOL = new java.util.concurrent.ThreadPoolExecutor(
+-        2, 2, 0, java.util.concurrent.TimeUnit.MILLISECONDS,
+-        new java.util.concurrent.LinkedBlockingQueue<>(),
+-        new com.google.common.util.concurrent.ThreadFactoryBuilder()
+-            .setNameFormat("Paper Async Command Builder Thread Pool - %1$d")
+-            .setUncaughtExceptionHandler(new net.minecraft.DefaultUncaughtExceptionHandlerWithName(net.minecraft.server.MinecraftServer.LOGGER))
+-            .build(),
+-        new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy()
+-    );
+-
+     private void sendAsync(ServerPlayer player, java.util.Collection<CommandNode<CommandSourceStack>> dispatcherRootChildren) {
+         // Paper end - Perf: Async command map building
+         Map<CommandNode<CommandSourceStack>, CommandNode<SharedSuggestionProvider>> map = Maps.newHashMap();
+@@ -379,9 +437,7 @@ public class Commands {
+ 
+     private void fillUsableCommands(
+         java.util.Collection<CommandNode<CommandSourceStack>> children, // Paper - Perf: Async command map building; pass copy of children
+-        CommandNode<SharedSuggestionProvider> rootSuggestion,
+-        CommandSourceStack source,
+-        Map<CommandNode<CommandSourceStack>, CommandNode<SharedSuggestionProvider>> commandNodeToSuggestionNode
++        CommandNode<SharedSuggestionProvider> rootSuggestion, CommandSourceStack source, Map<CommandNode<CommandSourceStack>, CommandNode<SharedSuggestionProvider>> commandNodeToSuggestionNode
+     ) {
+         for (CommandNode<CommandSourceStack> commandNode : children) { // Paper - Perf: Async command map building; pass copy of children
+             // Paper start - Brigadier API
+@@ -433,7 +489,7 @@ public class Commands {
+                 // when assigning serialization ids to each command node
+ 
+                 if (argumentBuilder instanceof RequiredArgumentBuilder) {
+-                    RequiredArgumentBuilder<SharedSuggestionProvider, ?> requiredArgumentBuilder = (RequiredArgumentBuilder<SharedSuggestionProvider, ?>)argumentBuilder;
++                    RequiredArgumentBuilder<SharedSuggestionProvider, ?> requiredArgumentBuilder = (RequiredArgumentBuilder<SharedSuggestionProvider, ?>) argumentBuilder;
+                     if (requiredArgumentBuilder.getSuggestionsProvider() != null) {
+                         requiredArgumentBuilder.suggests(SuggestionProviders.safelySwap(requiredArgumentBuilder.getSuggestionsProvider()));
+                     }
+@@ -453,114 +509,12 @@ public class Commands {
+         }
+     }
+ 
+-    public static LiteralArgumentBuilder<CommandSourceStack> literal(String name) {
+-        return LiteralArgumentBuilder.literal(name);
+-    }
+-
+-    public static <T> RequiredArgumentBuilder<CommandSourceStack, T> argument(String name, ArgumentType<T> type) {
+-        return RequiredArgumentBuilder.argument(name, type);
+-    }
+-
+-    public static Predicate<String> createValidator(Commands.ParseFunction parser) {
+-        return contents -> {
+-            try {
+-                parser.parse(new StringReader(contents));
+-                return true;
+-            } catch (CommandSyntaxException var3) {
+-                return false;
+-            }
+-        };
+-    }
+-
+     public CommandDispatcher<CommandSourceStack> getDispatcher() {
+         return this.dispatcher;
+     }
+ 
+-    public static <S> void validateParseResults(ParseResults<S> parseResults) throws CommandSyntaxException {
+-        CommandSyntaxException parseException = getParseException(parseResults);
+-        if (parseException != null) {
+-            throw parseException;
+-        }
+-    }
+-
+-    @Nullable
+-    public static <S> CommandSyntaxException getParseException(ParseResults<S> result) {
+-        if (!result.getReader().canRead()) {
+-            return null;
+-        } else if (result.getExceptions().size() == 1) {
+-            return result.getExceptions().values().iterator().next();
+-        } else {
+-            return result.getContext().getRange().isEmpty()
+-                ? CommandSyntaxException.BUILT_IN_EXCEPTIONS.dispatcherUnknownCommand().createWithContext(result.getReader())
+-                : CommandSyntaxException.BUILT_IN_EXCEPTIONS.dispatcherUnknownArgument().createWithContext(result.getReader());
+-        }
+-    }
+-
+-    public static CommandBuildContext createValidationContext(final HolderLookup.Provider provider) {
+-        return new CommandBuildContext() {
+-            @Override
+-            public FeatureFlagSet enabledFeatures() {
+-                return FeatureFlags.REGISTRY.allFlags();
+-            }
+-
+-            @Override
+-            public Stream<ResourceKey<? extends Registry<?>>> listRegistryKeys() {
+-                return provider.listRegistryKeys();
+-            }
+-
+-            @Override
+-            public <T> Optional<HolderLookup.RegistryLookup<T>> lookup(ResourceKey<? extends Registry<? extends T>> registryKey) {
+-                return provider.lookup(registryKey).map(this::createLookup);
+-            }
+-
+-            private <T> HolderLookup.RegistryLookup.Delegate<T> createLookup(final HolderLookup.RegistryLookup<T> registryLookup) {
+-                return new HolderLookup.RegistryLookup.Delegate<T>() {
+-                    @Override
+-                    public HolderLookup.RegistryLookup<T> parent() {
+-                        return registryLookup;
+-                    }
+-
+-                    @Override
+-                    public Optional<HolderSet.Named<T>> get(TagKey<T> tagKey) {
+-                        return Optional.of(this.getOrThrow(tagKey));
+-                    }
+-
+-                    @Override
+-                    public HolderSet.Named<T> getOrThrow(TagKey<T> tagKey) {
+-                        Optional<HolderSet.Named<T>> optional = this.parent().get(tagKey);
+-                        return optional.orElseGet(() -> HolderSet.emptyNamed(this.parent(), tagKey));
+-                    }
+-                };
+-            }
+-        };
+-    }
+-
+-    public static void validate() {
+-        CommandBuildContext commandBuildContext = createValidationContext(VanillaRegistries.createLookup());
+-        CommandDispatcher<CommandSourceStack> dispatcher = new Commands(Commands.CommandSelection.ALL, commandBuildContext).getDispatcher();
+-        RootCommandNode<CommandSourceStack> root = dispatcher.getRoot();
+-        dispatcher.findAmbiguities(
+-            (commandNode, commandNode1, commandNode2, collection) -> LOGGER.warn(
+-                "Ambiguity between arguments {} and {} with inputs: {}", dispatcher.getPath(commandNode1), dispatcher.getPath(commandNode2), collection
+-            )
+-        );
+-        Set<ArgumentType<?>> set = ArgumentUtils.findUsedArgumentTypes(root);
+-        Set<ArgumentType<?>> set1 = set.stream()
+-            .filter(argumentType -> !ArgumentTypeInfos.isClassRecognized(argumentType.getClass()))
+-            .collect(Collectors.toSet());
+-        if (!set1.isEmpty()) {
+-            LOGGER.warn(
+-                "Missing type registration for following arguments:\n {}",
+-                set1.stream().map(argumentType -> "\t" + argumentType).collect(Collectors.joining(",\n"))
+-            );
+-            throw new IllegalStateException("Unregistered argument types");
+-        }
+-    }
+-
+     public static enum CommandSelection {
+-        ALL(true, true),
+-        DEDICATED(false, true),
+-        INTEGRATED(true, false);
++        ALL(true, true), DEDICATED(false, true), INTEGRATED(true, false);
+ 
+         final boolean includeIntegrated;
+         final boolean includeDedicated;

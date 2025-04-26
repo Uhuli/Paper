@@ -9868,28 +9868,6 @@ index d381800ad054be6b054dcca43fbe80d3f0c0c771..00000000000000000000000000000000
 -        }
 -    }
 -}
-diff --git a/net/minecraft/server/commands/StopCommand.java b/net/minecraft/server/commands/StopCommand.java
-deleted file mode 100644
-index f9abe6dc3ce084dec2b0527e9baaa89a0eb6ed35..0000000000000000000000000000000000000000
---- a/net/minecraft/server/commands/StopCommand.java
-+++ /dev/null
-@@ -1,16 +0,0 @@
--package net.minecraft.server.commands;
--
--import com.mojang.brigadier.CommandDispatcher;
--import net.minecraft.commands.CommandSourceStack;
--import net.minecraft.commands.Commands;
--import net.minecraft.network.chat.Component;
--
--public class StopCommand {
--    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
--        dispatcher.register(Commands.literal("stop").requires(source -> source.hasPermission(4)).executes(context -> {
--            context.getSource().sendSuccess(() -> Component.translatable("commands.stop.stopping"), true);
--            context.getSource().getServer().halt(false);
--            return 1;
--        }));
--    }
--}
 diff --git a/net/minecraft/server/commands/StopSoundCommand.java b/net/minecraft/server/commands/StopSoundCommand.java
 deleted file mode 100644
 index 29d1f08c8aa8f386bb1d849575ce2c143455226d..0000000000000000000000000000000000000000
