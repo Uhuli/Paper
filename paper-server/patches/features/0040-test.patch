@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mika <Mika@zestnik.de>
+Date: Wed, 7 May 2025 22:45:42 +0200
+Subject: [PATCH] test
+
+
+diff --git a/net/minecraft/world/entity/LivingEntity.java b/net/minecraft/world/entity/LivingEntity.java
+index 4546aca8e2e144ec207653c713fc49f849908827..79cd7b86eaea878a4a4153226ca929b600916cb6 100644
+--- a/net/minecraft/world/entity/LivingEntity.java
++++ b/net/minecraft/world/entity/LivingEntity.java
+@@ -4476,7 +4476,7 @@ public abstract class LivingEntity extends Entity implements Attackable {
+ 
+     @Override
+     public float getVisualRotationYInDegrees() {
+-        return this.yBodyRot;
++        return Mth.lerp(1.0F, this.yBodyRotO, this.yBodyRot);
+     }
+ 
+     @Override
